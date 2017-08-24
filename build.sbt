@@ -3,7 +3,7 @@ organization := "com.nexthink"
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 version := "1.0.0"
 scalaVersion := "2.12.2"
-bintrayRepository := "nexthink"
+bintrayRepository := "maven"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",

@@ -19,7 +19,7 @@ A set of additional operators also allow overriding completions and specifying o
 Add the following lines to your `build.sbt` file:
  
  ```
- resolvers += Resolver.bintrayRepo("jchapuis/nexthink", "maven")
+ resolvers += Resolver.bintrayRepo("jchapuis", "maven")
  libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.0.0"
  ```
 
