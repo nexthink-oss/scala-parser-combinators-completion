@@ -1,4 +1,4 @@
-[![Build status](https://api.travis-ci.org/jchapuis/scala-parser-combinators-completion.svg?branch=master)](https://travis-ci.org/jchapuis/scala-parser-combinators-completion)
+[![Build status](https://travis-ci.org/jchapuis/scala-parser-combinators-completion.svg?branch=master)](https://travis-ci.org/jchapuis/scala-parser-combinators-completion)
 [![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Download](https://api.bintray.com/packages/jchapuis/nexthink/scala-parser-combinators-completion/images/download.svg) ](https://bintray.com/jchapuis/nexthink/scala-parser-combinators-completion/_latestVersion)
 
