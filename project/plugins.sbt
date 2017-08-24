@@ -1,2 +1,1 @@
-addSbtPlugin("me.lessis" % "bintray-sbt" % "0.3.0")
-addSbtPlugin("com.updateimpact" % "updateimpact-sbt-plugin" % "2.1.1")
+addSbtPlugin("org.foundweekends" % "sbt-bintray" % "0.5.1")
