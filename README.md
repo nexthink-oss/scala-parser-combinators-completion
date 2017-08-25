@@ -20,7 +20,7 @@ Add the following lines to your `build.sbt` file:
  
  ```
  resolvers += Resolver.bintrayRepo("jchapuis", "maven")
- libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.0.0"
+ libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.0.1"
  ```
 
 ## Completing on a grammar
