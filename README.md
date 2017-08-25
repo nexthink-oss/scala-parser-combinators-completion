@@ -230,3 +230,97 @@ Completing on the same expressions (`2`, `2+`, `(10*2`) now leads to the followi
 |`%?`    |defines the description of the completions tag|<code>("+" &#124; "-") %? "arithmetic operators"</code>|
 |`%%`    |defines the completions tag kind (can be used to encode properties for the tag, e.g. visual decorations)|<code>("+" &#124; "-") %% "style: highlight"</code>|
 |`%-%`   |defines the completion kind (can be used to encode properties for each completion entry, e.g. visual decorations)|<code>("+" %-% "style: highlight" &#124; "-")</code>|   
+
+## Fuzzy completion
+
+This library also provides special parsers which support fuzzy completion, present in the `FuzzyParsers` trait, by means of the `oneOfTerms` method capable of fuzzing completion on the input to match a set of terms.
+(note that parsing itself obviously requires an exact match and is really fast thanks to a prefix trie lookup on each input char). For instance, with the following dummy grammar:
+
+```scala
+object Grammar extends FuzzyParsers {
+  val fuzzyCountries = "my favourite country is " ~ oneOfTerms(Seq("United States of America", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua & Deps", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina", "Burma", "Burundi", "Cambodia", "Cameroon", "Canada", "Cape Verde", "Central African Rep", "Chad", "Chile", "People's Republic of China", "Republic of China", "Colombia", "Comoros", "Democratic Republic of the Congo", "Republic of the Congo", "Costa Rica,", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Danzig", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gaza Strip", "The Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Holy Roman Empire", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Republic of Ireland", "Israel", "Italy", "Ivory Coast", "Jamaica", "Japan", "Jonathanland", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "North Korea", "South Korea", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Macedonia", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mount Athos", "Mozambique", "Namibia", "Nauru", "Nepal", "Newfoundland", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "Norway", "Oman", "Ottoman Empire", "Pakistan", "Palau", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Prussia", "Qatar", "Romania", "Rome", "Russian Federation", "Rwanda", "St Kitts & Nevis", "St Lucia", "Saint Vincent & the", "Grenadines", "Samoa", "San Marino", "Sao Tome & Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "Spain", "Sri Lanka", "Sudan", "Suriname", "Swaziland", "Sweden", "Switzerland", "Syria", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Trinidad & Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"))
+}
+```
+
+Performing the following completion:
+
+```scala
+Grammar.completeString(Grammar.fuzzyCountries, "my favourite country is Swtlz")
+``` 
+
+leads to this output:
+
+```scala
+List(Sweden, Swaziland, Switzerland)
+```
+
+`oneOfTerms` sets the similarity metric in the completion entry score, so that completions can be ordered:
+
+```scala
+Grammar.complete(Grammar.fuzzyCountries, "my favourite country is Thld")
+``` 
+ 
+leads to:
+
+```json
+{
+  "position": {
+    "line": 1,
+    "column": 25
+  },
+  "sets": [
+    {
+      "tag": {
+        "label": "",
+        "score": 0
+      },
+      "completions": [
+         {
+          "value": "Thailand",
+          "score": 43
+        },
+        {
+          "value": "The Gambia",
+          "score": 25
+        },
+        {
+          "value": "Jonathanland",
+          "score": 22
+        },
+        {
+          "value": "Chad",
+          "score": 20
+        },
+        {
+          "value": "Togo",
+          "score": 20
+        }
+      ]
+    }
+  ]
+}
+```
+
+### `oneOfTerms` parameters
+
+Below the signature of the `oneOfTerms` method:
+
+```scala
+ def oneOfTerms(terms: Seq[String],
+                similarityMeasure: (String, String) => Double = diceSorensenSimilarity,
+                similarityThreshold: Int = DefaultSimilarityThreshold,
+                maxCompletionsCount: Int = DefaultMaxCompletionsCount)
+```
+
+ - `terms`: the list of terms to build the parser for
+ - `similarityMeasure`: the string similarity metric to be used. Any `(String, String) => Double` function can be passed in, but the library provides DiceSorensen (default), JaroWinkler, Leenshtein & NgramDistance. Metric choice depends on factors such as type of terms, performance, etc. See below for more information about the underlying data structure.
+ - `similarityThreshold`: the minimum similarity score for an entry to be considered as a completion candidate
+ - `maxCompletionsCount`: maximum number of completions returned by the parser   
+
+### Fuzzy matching technique
+For fuzzy completion, terms are decomposed in their trigrams and stored in a map indexed by the corresponding trigrams. This allows fast lookup of a set of completion candidates which share the same trigrams as the input. These candidates are ranked by the number of shared trigrams with the input, and a subset of the highest ranked candidates are kept. These candidates are then re-evaluated with the specified similarity metric (`similarityMeasure`), which is assumed to be more precise (and thus slower).
+
+The top candidates according to `maxCompletionsCount` are returned as completions. 
+
+Note that terms are affixed so that the starting and ending two characters count more than the others in order to favor completions which start or end with the same characters as the input.
+  
