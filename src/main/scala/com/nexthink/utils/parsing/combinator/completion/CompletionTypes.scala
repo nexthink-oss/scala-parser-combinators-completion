@@ -7,7 +7,12 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
+import org.json4s
+
 import scala.util.parsing.input.{NoPosition, Position}
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.native.JsonMethods._
 
 /**  Collection of data types allowing definition of structured parser completions.
   *  A `Completions` instance can contain multiple `CompletionSet`s instances. A `CompletionSet` provides a set of
@@ -39,10 +44,7 @@ trait CompletionTypes {
     * @param kind tag kind (optional) - can be used e.g. to define visual style
     */
   case class CompletionTag(label: String, score: Int, description: Option[String], kind: Option[String]) {
-    def update(newTag: Option[String],
-               newScore: Option[Int],
-               newDescription: Option[String],
-               newKind: Option[String]): CompletionTag =
+    def update(newTag: Option[String], newScore: Option[Int], newDescription: Option[String], newKind: Option[String]): CompletionTag =
       copy(
         label = newTag.getOrElse(label),
         score = newScore.getOrElse(score),
@@ -50,7 +52,12 @@ trait CompletionTypes {
         kind = newKind.map(Some(_)).getOrElse(kind)
       )
 
-    override def toString: String = label
+    private[CompletionTypes] def serializeJson: json4s.JObject = {
+      ("label" -> label) ~ ("score" -> score) ~ ("description" -> description) ~ ("kind" -> kind)
+    }
+
+    override def toString: String = pretty(render(serializeJson))
+    def toJson: String            = compact(render(serializeJson))
   }
 
   case object CompletionTag {
@@ -73,6 +80,12 @@ trait CompletionTypes {
     def kind: Option[String]        = tag.kind
     def completionStrings: Seq[String] =
       completions.toSeq.sorted.map(_.value.toString)
+
+    private[CompletionTypes] def serializeJson =
+      ("tag" -> tag.serializeJson) ~ ("completions" -> completions.map(_.serializeJson).toList)
+
+    override def toString: String = pretty(render(serializeJson))
+    def toJson: String            = compact(render(serializeJson))
   }
 
   case object CompletionSet {
@@ -112,6 +125,12 @@ trait CompletionTypes {
     require(value.nonEmpty, "empty completion")
     def updateKind(newKind: Option[String]): Completion =
       copy(kind = newKind.map(Some(_)).getOrElse(kind))
+
+    private[CompletionTypes] def serializeJson = ("value" -> value.toString()) ~ ("score" -> score) ~ ("kind" -> kind)
+
+    def toJson: String = compact(render(serializeJson))
+
+    override def toString: String = pretty(render(serializeJson))
   }
   case object Completion {
     def apply(el: Elem): Completion = Completion(Seq(el))
@@ -130,6 +149,11 @@ trait CompletionTypes {
     def allSets: Iterable[CompletionSet]               = sets.values
     def allCompletions: Iterable[Completion]           = allSets.flatMap(_.completions)
     def defaultSet: Option[CompletionSet]              = sets.get("")
+
+    private def serializeJson = ("position" -> (("line" -> position.line) ~ ("column" -> position.column))) ~ ("sets" -> allSets.map(_.serializeJson))
+
+    override def toString: String = pretty(render(serializeJson))
+    def toJson: String            = compact(render(serializeJson))
 
     private def unionSets(left: CompletionSet, right: CompletionSet): CompletionSet = {
       def offsetCompletions(set: CompletionSet) = {
@@ -201,9 +225,7 @@ trait CompletionTypes {
     }
 
     def setsScoredWithMaxCompletion(): Completions = {
-      Completions(
-        position,
-        sets.mapValues(s => CompletionSet(s.tag.copy(score = s.completions.map(_.score).max), s.completions)))
+      Completions(position, sets.mapValues(s => CompletionSet(s.tag.copy(score = s.completions.map(_.score).max), s.completions)))
     }
   }
 

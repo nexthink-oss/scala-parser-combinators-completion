@@ -14,7 +14,7 @@ object MyParsers extends RegexParsers with RegexCompletionSupport
 Parsers are thus 'augmented' with a `completions` method which returns possible entry completions for a certain input. This can be used to elaborate as-you-type completions menus or tab-completion experiences, and is e.g. easy to plug with readline to implement a console application. 
 A set of additional operators also allow overriding completions and specifying ordering and grouping properties for completions. 
 
-## Adding an SBT dependency
+## Adding a SBT dependency
 
 Add the following lines to your `build.sbt` file:
  
@@ -23,11 +23,11 @@ Add the following lines to your `build.sbt` file:
  libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.0.0"
  ```
 
-## Completing on a standard grammar
+## Completing on a grammar
 Below is a simple arithmetic expression grammar defined with parser combinators:
 
 ```scala
-import com.nexthink.util.parsing.combinator.RegexParsers
+import com.nexthink.utils.parsing.combinator.RegexParsers
 object ExprParser extends RegexParsers with RegexCompletionSupport {
   val number = "[0-9]+".r
   lazy val expr = term ~
@@ -62,24 +62,15 @@ leading to outputs
 [1.13] parsed: 2
 ```
 
-Additional methods `complete` and `completions` are now available in `RegexParsers` and `Parsers` respectively which list possible completions according to a certain input:
+Methods `complete` and `completeString` are available in `RegexCompletionSupport` which list possible completions according to a certain input:
  
 ```
-ExprParser.complete(ExprParser.expr, "2")
-ExprParser.complete(ExprParser.expr, "2+")
-ExprParser.complete(ExprParser.expr, "(10*2")
+ExprParser.completeString(ExprParser.expr, "2")
+ExprParser.completeString(ExprParser.expr, "2+")
+ExprParser.completeString(ExprParser.expr, "(10*2")
 ```
 
 lead to outputs
-```
-Completions(1.2,Map( -> CompletionSet(,0,None,Set(Completion(*,0), Completion(/,0), Completion(+,0), Completion(-,0)))))
-Completions(1.3,Map( -> CompletionSet(,0,None,Set(Completion((,0)))))
-Completions(1.6,Map( -> CompletionSet(,0,None,Set(Completion(+,0), Completion(-,0), Completion(/,0), Completion(),0), Completion(*,0)))))
-```
-
-The first member of `Completions` is the position in the input at which the completions apply, e.g. `1.2` means second char on the first line. The second member is a map of `CompletionSet`, each set having an identifier, score and optional description and a set of `Completion` instances, each one scored as well. Note that in this case we have not specified any identifier for the completions thus they are mapped to the default set identifier (`""`), with default score (`0`). In such an example this type algebra might seem overkill, but in real completion-ready grammars this allows defining a rich completion experience for users. This will become cleared in the section below, where we'll add more context to the grammar to refine these completions. 
-   
-Such simple completions are easier to visualize with when calling `completionStrings` on those `Completions` instances:
 
 ```
 res2: Seq[String] = List(*, +, -, /)
@@ -91,6 +82,8 @@ In other words
  * "`2`" completes to alternatives `*` `+` `-` `/`
  * "`2+`" completes to a single option  `(`
  * "`(10*2`" completes to alternatives `)` `*` `+` `-` `/`
+
+(note that using the method `complete` with the same inputs would lead to structured completion results rather than plain strings, see below for more details)
 
 ## Decorated grammar
 
@@ -123,25 +116,108 @@ object DecoratedExprParser extends RegexParsers with RegexCompletionSupport {
 Completing on the same expressions (`2`, `2+`, `(10*2`) now leads to the following results:
 
 `2` completes to 
-```Completions(1.2,
-    Map(operators -> CompletionSet(operators,10,Some(arithmetic operators),
-                        Set(Completion(*,0), Completion(/,0), Completion(+,0), Completion(-,0)))))
+```json
+{
+     "position":{
+       "line":1,
+       "column":2
+     },
+     "sets":[{
+       "tag":{
+         "label":"operators",
+         "score":10,
+         "description":"arithmetic operators"
+       },
+       "completions":[{
+         "value":"*",
+         "score":10
+       },{
+         "value":"/",
+         "score":10
+       },{
+         "value":"+",
+         "score":10
+       },{
+         "value":"-",
+         "score":10
+       }]
+     }]
+   }
 ```
 
 `2+` completes to 
-```Completions(1.3,
-    Map(number -> CompletionSet(number,0,Some(any number),
-                    Set(Completion(1,0), Completion(10,0), Completion(99,0))), 
-        delimiters -> CompletionSet(delimiters,0,None,
-                    Set(Completion((,0)))))
+```json
+{
+  "position":{
+    "line":1,
+    "column":3
+  },
+  "sets":[{
+    "tag":{
+      "label":"number",
+      "score":0,
+      "description":"any number"
+    },
+    "completions":[{
+      "value":"1",
+      "score":0
+    },{
+      "value":"10",
+      "score":0
+    },{
+      "value":"99",
+      "score":0
+    }]
+  },{
+    "tag":{
+      "label":"",
+      "score":0
+    },
+    "completions":[{
+      "value":"(",
+      "score":0
+    }]
+  }]
+}
 ```
 
 `(10*2` completes to 
-```Completions(1.6,
-    Map(operators -> CompletionSet(operators,10,Some(arithmetic operators), 
-                        Set(Completion(*,0), Completion(/,0), Completion(+,0), Completion(-,0))), 
-        delimiters -> CompletionSet(delimiters,0,None,
-                        Set(Completion(),0)))))
+```json
+{
+  "position":{
+    "line":1,
+    "column":6
+  },
+  "sets":[{
+    "tag":{
+      "label":"operators",
+      "score":10,
+      "description":"arithmetic operators"
+    },
+    "completions":[{
+      "value":"*",
+      "score":10
+    },{
+      "value":"/",
+      "score":10
+    },{
+      "value":"+",
+      "score":10
+    },{
+      "value":"-",
+      "score":10
+    }]
+  },{
+    "tag":{
+      "label":"",
+      "score":0
+    },
+    "completions":[{
+      "value":")",
+      "score":0
+    }]
+  }]
+}
 ```
 
 ## Completion operators
@@ -149,16 +225,8 @@ Completing on the same expressions (`2`, `2+`, `(10*2`) now leads to the followi
 |Operator|Description|Example|
 |--------|-----------|-------|
 |`%>`    |defines an explicit set of possible completions, e.g. to give examples|`"[0-9]+".r %> ("1", "10", "99")`|
-|`%`     |defines the category of completions (i.e. completion set name)|<code>("+" &#124; "-") % "operators"</code>|
-|`%`     |followed by an `Int`, defines the completion set score|<code>("+" &#124; "-") % 10</code>|
-|`%?`    |provides a description to the completion set|<code>("+" &#124; "-") %? "arithmetic operators"</code>|   
-
-## Completion types
-```scala
-case class Completion(value: Elems, score: Int)
-case class CompletionSet(tag: String,
-                         score: Int,
-                         description: Option[String],
-                         completions: Set[Completion])
-case class Completions(position: Position, sets: Map[String, CompletionSet])
-```
+|`%`     |defines the completions tag|<code>("+" &#124; "-") % "operators"</code>|
+|`%`     |followed by an `Int`, defines the completion tag score|<code>("+" &#124; "-") % 10</code>|
+|`%?`    |provides a description to the completion set|<code>("+" &#124; "-") %? "arithmetic operators"</code>|
+|`%%`    |defines the completion tag kind (can be used to encode properties for the tag, e.g. visual decorations)|<code>("+" &#124; "-") %% "style: highlight"</code>|
+|`%-%`   |defines the completion kind (can be used to encode properties for each completion entry, e.g. visual decorations)|<code>("+" %-% "style: highlight" &#124; "-")</code>|   
