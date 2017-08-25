@@ -227,6 +227,6 @@ Completing on the same expressions (`2`, `2+`, `(10*2`) now leads to the followi
 |`%>`    |defines an explicit set of possible completions, e.g. to give examples|`"[0-9]+".r %> ("1", "10", "99")`|
 |`%`     |defines the completions tag|<code>("+" &#124; "-") % "operators"</code>|
 |`%`     |followed by an `Int`, defines the completion tag score|<code>("+" &#124; "-") % 10</code>|
-|`%?`    |provides a description to the completion set|<code>("+" &#124; "-") %? "arithmetic operators"</code>|
-|`%%`    |defines the completion tag kind (can be used to encode properties for the tag, e.g. visual decorations)|<code>("+" &#124; "-") %% "style: highlight"</code>|
+|`%?`    |defines the description of the completions tag|<code>("+" &#124; "-") %? "arithmetic operators"</code>|
+|`%%`    |defines the completions tag kind (can be used to encode properties for the tag, e.g. visual decorations)|<code>("+" &#124; "-") %% "style: highlight"</code>|
 |`%-%`   |defines the completion kind (can be used to encode properties for each completion entry, e.g. visual decorations)|<code>("+" %-% "style: highlight" &#124; "-")</code>|   
