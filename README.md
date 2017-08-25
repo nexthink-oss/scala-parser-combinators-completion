@@ -233,8 +233,7 @@ Completing on the same expressions (`2`, `2+`, `(10*2`) now leads to the followi
 
 ## Fuzzy completion
 
-This library also provides special parsers which support fuzzy completion, present in the `FuzzyParsers` trait, by means of the `oneOfTerms` method capable of fuzzing completion on the input to match a set of terms.
-(note that parsing itself obviously requires an exact match and is really fast thanks to a prefix trie lookup on each input char). For instance, with the following dummy grammar:
+This library also provides special parsers which support fuzzy completion, present in the `FuzzyParsers` trait, by means of the `oneOfTerms` method capable of fuzzing completion on the input to match a set of terms (note that parsing itself obviously requires an exact match and is really fast thanks to a prefix trie lookup on each input char). For instance, with the following dummy grammar:
 
 ```scala
 object Grammar extends FuzzyParsers {
@@ -313,14 +312,14 @@ Below the signature of the `oneOfTerms` method:
 ```
 
  - `terms`: the list of terms to build the parser for
- - `similarityMeasure`: the string similarity metric to be used. Any `(String, String) => Double` function can be passed in, but the library provides DiceSorensen (default), JaroWinkler, Leenshtein & NgramDistance. Metric choice depends on factors such as type of terms, performance, etc. See below for more information about the underlying data structure.
+ - `similarityMeasure`: the string similarity metric to be used. Any `(String, String) => Double` function can be passed in, but the library provides DiceSorensen (default), JaroWinkler, Levenshtein & NgramDistance. Metric choice depends on factors such as type of terms, performance, etc. See below for more information about the underlying data structure.
  - `similarityThreshold`: the minimum similarity score for an entry to be considered as a completion candidate
  - `maxCompletionsCount`: maximum number of completions returned by the parser   
 
 ### Fuzzy matching technique
-For fuzzy completion, terms are decomposed in their trigrams and stored in a map indexed by the corresponding trigrams. This allows fast lookup of a set of completion candidates which share the same trigrams as the input. These candidates are ranked by the number of shared trigrams with the input, and a subset of the highest ranked candidates are kept. These candidates are then re-evaluated with the specified similarity metric (`similarityMeasure`), which is assumed to be more precise (and thus slower).
+For fuzzy completion, terms are decomposed in their trigrams and stored in a map which indexes terms per trigram. This allows fast lookup of a set of completion candidates which share the same trigrams as the input. These candidates are ranked by the number of shared trigrams with the input, and a subset of the highest ranked candidates are kept. This selection of candidates is then re-evaluated with the specified similarity metric (`similarityMeasure`), which is assumed to be more precise (and thus slower).
 
 The top candidates according to `maxCompletionsCount` are returned as completions. 
 
-Note that terms are affixed so that the starting and ending two characters count more than the others in order to favor completions which start or end with the same characters as the input.
+Note that terms are affixed so that the starting and ending two characters count more than the others, in order to favor completions which start or end with the same characters as the input.
   
