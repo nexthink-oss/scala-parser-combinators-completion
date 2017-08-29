@@ -7,8 +7,10 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
+import java.io.StringReader
+
 import scala.util.parsing.combinator.Parsers
-import scala.util.parsing.input.Positional
+import scala.util.parsing.input.{CharSequenceReader, Positional}
 import scala.language.implicitConversions
 
 // scalastyle:off method.name
@@ -895,4 +897,6 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     */
   def phrase[T](p: Parser[T]): Parser[T] =
     Parser(super.phrase(p), p.completions)
+
+
 }
