@@ -11,7 +11,26 @@ import scala.util.parsing.input.{CharSequenceReader, Position, Reader}
 
 trait RegexCompletionSupportWithExpansion extends RegexCompletionSupport {
 
-  def expandedCompletions[T](p: Parser[T]): Parser[T]                  = expandedCompletions(p, p)
+  /**
+    * Adapts a parser so that completing it will list all possible expanded completions (which successfully parse)
+    * (note that if this is used within the context of a grammar allowing for infinitely growing expressions, this
+    * will trigger infinite recursion and will end up in a `StackOverflowException`)
+    * @param p the parser
+    * @tparam T the parser type
+    * @return a parser adapter performing completion expansion
+    */
+  def expandedCompletions[T](p: Parser[T]): Parser[T] = expandedCompletions(p, p)
+
+  /**
+    * Adapts a parser so that completing it will construct the list of all possible alternatives up to the point
+    * where the passed `stop` parser successfully parses the expansions.
+    * (note that if this is used within the context of a grammar allowing for infinitely growing expressions,
+    * selecting the relevant stop parser is critical to avoid infinite recursion)
+    * @param p the parser
+    * @param stop the parser signalling the end of exploration upon successful parse
+    * @tparam T the parser type
+    * @return a parser adapter performing completion expansion limited according to `stop` parser
+    */
   def expandedCompletions[T](p: Parser[T], stop: Parser[T]): Parser[T] =
     Parser(p, in => {
       exploreCompletions(p, stop, in)
@@ -24,25 +43,19 @@ trait RegexCompletionSupportWithExpansion extends RegexCompletionSupport {
       else
         completions.allSets
           .map(cSet => {
-            val completionPos                     = completions.position.column
-            val inputCompletedWithFirstSetElement = ExplorerReader(p, completeString(str, completionPos, cSet.completions.head))
-            if (stop(inputCompletedWithFirstSetElement).successful) {
-              // we consider we have reached stop condition with this completion set
-              Completions(in.pos, CompletionSet(cSet.tag, cSet.completions.map(c => Completion(completeString(str, completionPos, c), c.score, c.kind))))
-            } else {
-              // continue exploring
-              cSet.completions
-                .map(c => {
-                  val completedInput = completeString(str, completionPos, c)
-                  println(completedInput)
+            cSet.completions
+              .map(c => {
+                val completedInput = completeString(str, completions.position.column, c)
+                if (stop(new CharSequenceReader(completedInput)).successful) {
+                  Completions(in.pos, CompletionSet(cSet.tag, Set(Completion(completedInput, c.score, c.kind))))
+                } else {
                   exploreCompletionsRec(completedInput, p.completions(ExplorerReader(p, completedInput)))
-                })
-                .reduce((a, b) => a | b)
-            }
+                }
+              })
+              .reduce((a, b) => a | b)
           })
           .reduce((a, b) => a | b)
     }
-
     if (in match {
           case ExplorerReader(exploredParser, _, _) if exploredParser == p => true
           case _                                                           => false
