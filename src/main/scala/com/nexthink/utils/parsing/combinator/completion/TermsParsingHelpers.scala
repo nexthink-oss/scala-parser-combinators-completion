@@ -5,15 +5,14 @@
 **  Author: jonas.chapuis@nexthink.com                   **
 \*                                                       */
 
-package com.nexthink.utils.parsing.combinator.fuzzy
+package com.nexthink.utils.parsing.combinator.completion
 
 import com.nexthink.utils.collections.PrefixMap
-import com.nexthink.utils.parsing.combinator.completion.RegexCompletionSupport
 
-import scala.util.parsing.combinator.Parsers
+import scala.util.parsing.combinator.RegexParsers
 import scala.util.parsing.input.Reader
 
-trait FuzzyParsingHelpers { this: Parsers with RegexCompletionSupport =>
+trait TermsParsingHelpers { this: RegexParsers =>
 
   def remainder[T](reader: Reader[T]): String =
     reader.source.subSequence(reader.pos.column - 1, reader.source.length).toString
@@ -24,15 +23,27 @@ trait FuzzyParsingHelpers { this: Parsers with RegexCompletionSupport =>
     reader.source.subSequence(start, end).toString
   private def lastPosition[T](reader: Reader[T]): Int = reader.source.length
 
-  protected def findAllMatchingTerms(in: Input, pos: Int, map: PrefixMap[String]): (Seq[String], Int) = {
-    def findAllMatchingTermsIter(in: Input, pos: Int, map: PrefixMap[String], prevMatches: Seq[String]): (Seq[String], Int) = {
+  protected def findAllMatchingTerms(in: Input, pos: Int, map: PrefixMap[String]): (Seq[(String, Int)], Int) = {
+    def findAllMatchingTermsIter(in: Input, pos: Int, map: PrefixMap[String], prevMatches: Seq[(String, Int)]): (Seq[(String, Int)], Int) = {
       lazy val nextSuffixChar = charAtPosition(in, pos)
       if (handleWhiteSpace(in.source, pos) < lastPosition(in) && map.hasSuffix(nextSuffixChar)) {
-        findAllMatchingTermsIter(in, pos + 1, map.withPrefix(nextSuffixChar), prevMatches ++ map.value)
+        findAllMatchingTermsIter(in, pos + 1, map.withPrefix(nextSuffixChar), prevMatches ++ map.value.map((_, pos)))
       } else {
-        (prevMatches ++ map.value, pos)
+        (prevMatches ++ map.value.map((_, pos)), pos)
       }
     }
     findAllMatchingTermsIter(in, pos, map, Seq())
+  }
+
+  protected def findAllTermsWithPrefix(in: Input, pos: Int, map: PrefixMap[String]): Seq[String] = {
+    def findAllTermsWithPrefixIter(in: Input, pos: Int, map: PrefixMap[String]): Seq[String] = {
+      lazy val nextSuffixChar = charAtPosition(in, pos)
+      if (handleWhiteSpace(in.source, pos) < lastPosition(in) && map.hasSuffix(nextSuffixChar)) {
+        findAllTermsWithPrefixIter(in, pos + 1, map.withPrefix(nextSuffixChar))
+      } else {
+        map.toSeq.map { case (_, term) => term }
+      }
+    }
+    findAllTermsWithPrefixIter(in, pos, map)
   }
 }

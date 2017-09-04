@@ -9,7 +9,7 @@ package com.nexthink.utils.parsing.combinator.completion
 
 import scala.util.matching.Regex
 import scala.util.parsing.combinator.RegexParsers
-import scala.util.parsing.input.{CharSequenceReader, OffsetPosition, Positional, Reader}
+import scala.util.parsing.input._
 import scala.language.implicitConversions
 
 /** This component extends `RegexParsers` with completion capability. In particular,
@@ -22,7 +22,7 @@ import scala.language.implicitConversions
 trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
   protected val areLiteralsCaseSensitive = false
 
-  protected def dropWhiteSpace(input: Input): Input =
+  protected def dropAnyWhiteSpace(input: Input): Input =
     input.drop(handleWhiteSpace(input.source, input.offset) - input.offset)
 
   protected def handleWhiteSpace(input: Input): Int =
@@ -36,8 +36,7 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
     var sourcePos  = start
     def charsEqual(a: Char, b: Char) =
       if (areLiteralsCaseSensitive) a == b else a.toLower == b.toLower
-    while (literalPos < s.length && sourcePos < source.length && charsEqual(s.charAt(literalPos),
-                                                                            source.charAt(sourcePos))) {
+    while (literalPos < s.length && sourcePos < source.length && charsEqual(s.charAt(literalPos), source.charAt(sourcePos))) {
       literalPos += 1
       sourcePos += 1
     }
@@ -55,8 +54,7 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
         literalOffset match {
           case 0 if inputAtEnd =>
             literalCompletion // whitespace, free entry possible
-          case someOffset: Int
-              if inputAtEnd & someOffset > 0 & someOffset < s.length => // partially entered literal, we are at the end
+          case someOffset: Int if inputAtEnd & someOffset > 0 & someOffset < s.length => // partially entered literal, we are at the end
             literalCompletion
           case _ => Completions.empty
         }
@@ -84,3 +82,5 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
     complete(p, input).completionStrings
 
 }
+
+
