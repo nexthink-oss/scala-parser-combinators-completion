@@ -22,7 +22,7 @@ import scala.language.implicitConversions
 trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
   protected val areLiteralsCaseSensitive = false
 
-  protected def dropWhiteSpace(input: Input): Input =
+  protected def dropAnyWhiteSpace(input: Input): Input =
     input.drop(handleWhiteSpace(input.source, input.offset) - input.offset)
 
   protected def handleWhiteSpace(input: Input): Int =

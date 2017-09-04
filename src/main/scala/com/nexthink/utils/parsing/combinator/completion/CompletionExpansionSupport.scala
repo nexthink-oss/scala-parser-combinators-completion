@@ -7,19 +7,20 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
-import scala.util.parsing.input.{CharSequenceReader, Position, Reader}
+import scala.util.parsing.input.{CharSequenceReader, OffsetPosition, Position, Reader}
 
-trait RegexCompletionSupportWithExpansion extends RegexCompletionSupport {
+trait CompletionExpansionSupport extends RegexCompletionSupport {
 
   /**
     * Adapts a parser so that completing it will list all possible expanded completions (which successfully parse)
     * (note that if this is used within the context of a grammar allowing for infinitely growing expressions, this
     * will trigger infinite recursion and will end up in a `StackOverflowException`)
     * @param p the parser
+    * @param onlyAtInputEnd expansion happens only when input is positioned exactly at the end upon completion
     * @tparam T the parser type
     * @return a parser adapter performing completion expansion
     */
-  def expandedCompletions[T](p: Parser[T]): Parser[T] = expandedCompletions(p, p)
+  def allExpandedCompletions[T](p: Parser[T], onlyAtInputEnd: Boolean = true): Parser[T] = expandedCompletions(p, p, onlyAtInputEnd)
 
   /**
     * Adapts a parser so that completing it will construct the list of all possible alternatives up to the point
@@ -27,17 +28,29 @@ trait RegexCompletionSupportWithExpansion extends RegexCompletionSupport {
     * (note that if this is used within the context of a grammar allowing for infinitely growing expressions,
     * selecting the relevant stop parser is critical to avoid infinite recursion)
     * @param p the parser
+    * @param onlyAtInputEnd expansion happens only when input is positioned exactly at the end upon completion
     * @param stop the parser signalling the end of exploration upon successful parse
     * @tparam T the parser type
     * @return a parser adapter performing completion expansion limited according to `stop` parser
     */
-  def expandedCompletions[T](p: Parser[T], stop: Parser[T]): Parser[T] =
-    Parser(p, in => {
-      exploreCompletions(p, stop, in)
-    })
+  def expandedCompletions[T](p: Parser[T], stop: Parser[Any], onlyAtInputEnd: Boolean = true): Parser[T] =
+    Parser(
+      p,
+      in => {
+        lazy val isAtInputEnd = dropAnyWhiteSpace(in).atEnd
+        if (!onlyAtInputEnd || isAtInputEnd) {
+          val Completions(_, sets) = exploreCompletions(p, stop, in)
+          Completions(OffsetPosition(in.source, handleWhiteSpace(in)), sets)
+        } else
+          p.completions(in)
+      }
+    )
 
-  private def exploreCompletions[T](p: Parser[T], stop: Parser[T], in: Input) = {
-    def completeString(s: String, position: Int, c: Completion) = s"${s.substring(0, position - 1)} ${c.value}"
+  private def exploreCompletions[T](p: Parser[T], stop: Parser[T], in: Input): Completions = {
+    def completeString(s: String, position: Int, c: Completion) = {
+      val input = s.substring(0, position - 1)
+      if (input.trim.isEmpty) c.value.toString() else s"$input ${c.value}"
+    }
     def exploreCompletionsRec(str: String, completions: Completions): Completions = {
       if (completions.isEmpty) completions
       else
