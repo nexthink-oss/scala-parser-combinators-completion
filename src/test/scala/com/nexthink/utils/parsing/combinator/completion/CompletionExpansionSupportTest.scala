@@ -20,7 +20,7 @@ class CompletionExpansionSupportTest {
     def term(maxNesting: Int)                = factor(maxNesting) ~ "*" ~! factor(maxNesting)
     def factor(maxNesting: Int): Parser[Any] = if (maxNesting == 0) number else number | "(" ~> expr(maxNesting - 1) <~ ")"
 
-    def exprWithExpandedCompletions() = allExpandedCompletions(expr(1))
+    def exprWithExpandedCompletions() = expandedCompletions(expr(1))
   }
 
   @Test
@@ -41,7 +41,7 @@ class CompletionExpansionSupportTest {
     val jumpsOver                = "which jumps over the lazy" % "action"
     val jumpsOverDogOrCat        = jumpsOver ~ ("dog" | "cat") % "animal" %? "dogs and cats" % 10
     lazy val parser              = jumpsOverDogOrCat | jumpsOverDogOrCat ~ which()
-    def which(): Parser[Any]     = expandedCompletions(parser, stop = jumpsOverDogOrCat ~ jumpsOverDogOrCat)
+    def which(): Parser[Any]     = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat)
     lazy val infiniteDogsAndCats = fox ~ which
   }
 

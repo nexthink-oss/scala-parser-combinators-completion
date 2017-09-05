@@ -20,26 +20,26 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
     * @tparam T the parser type
     * @return a parser adapter performing completion expansion
     */
-  def allExpandedCompletions[T](p: Parser[T], onlyAtInputEnd: Boolean = true): Parser[T] = expandedCompletions(p, p, onlyAtInputEnd)
+  def expandedCompletions[T](p: Parser[T], onlyAtInputEnd: Boolean = true): Parser[T] = expandedCompletionsWithLimiter(p, p, onlyAtInputEnd)
 
   /**
     * Adapts a parser so that completing it will construct the list of all possible alternatives up to the point
-    * where the passed `stop` parser successfully parses the expansions.
+    * where the passed `limiter` parser successfully parses the expansions.
     * (note that if this is used within the context of a grammar allowing for infinitely growing expressions,
-    * selecting the relevant stop parser is critical to avoid infinite recursion)
+    * selecting the relevant limiter parser is critical to avoid infinite recursion)
     * @param p the parser
     * @param onlyAtInputEnd expansion happens only when input is positioned exactly at the end upon completion
-    * @param stop the parser signalling the end of exploration upon successful parse
+    * @param limiter the parser signalling the end of exploration upon successful parse
     * @tparam T the parser type
-    * @return a parser adapter performing completion expansion limited according to `stop` parser
+    * @return a parser adapter performing completion expansion limited according to `limiter` parser
     */
-  def expandedCompletions[T](p: Parser[T], stop: Parser[Any], onlyAtInputEnd: Boolean = true): Parser[T] =
+  def expandedCompletionsWithLimiter[T](p: Parser[T], limiter: Parser[Any], onlyAtInputEnd: Boolean = true): Parser[T] =
     Parser(
       p,
       in => {
         lazy val isAtInputEnd = dropAnyWhiteSpace(in).atEnd
         if (!onlyAtInputEnd || isAtInputEnd) {
-          val Completions(_, sets) = exploreCompletions(p, stop, in)
+          val Completions(_, sets) = exploreCompletions(p, limiter, in)
           Completions(OffsetPosition(in.source, handleWhiteSpace(in)), sets)
         } else
           p.completions(in)
