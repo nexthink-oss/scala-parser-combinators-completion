@@ -60,7 +60,7 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
               .map(c => {
                 val completedInput = completeString(str, completions.position.column, c)
                 if (stop(new CharSequenceReader(completedInput)).successful) {
-                  Completions(in.pos, CompletionSet(cSet.tag, Set(Completion(completedInput, c.score, c.kind))))
+                  Completions(in.pos, CompletionSet(cSet.tag, Set(Completion(completedInput, c.score, c.meta))))
                 } else {
                   exploreCompletionsRec(completedInput, p.completions(ExplorerReader(p, completedInput)))
                 }

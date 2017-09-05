@@ -19,11 +19,11 @@ import org.json4s.native.JsonMethods._
   *  `Completion` entries and is tagged with a `CompletionTag`.
   *
   *  Sets allow structuring the completion entries into groups, each group tagged with a `label` (plus optional
-  *  `description` and `kind`, the latter allowing e.g. encoding visual attributes for the set).
+  *  `description` and `meta`, the latter allowing e.g. encoding visual attributes for the set).
   *  Sets also feature a score, which defines the order between sets within the `Completions` instance.
   *
-  *  Each `Completion` entry within a set has a `value`, a `score` and a `kind`:
-  *  the score allows ordering the entries within a set, and the kind can e.g. be used to assign a representation style
+  *  Each `Completion` entry within a set has a `value`, a `score` and a `meta`:
+  *  the score allows ordering the entries within a set, and the meta can e.g. be used to assign a representation style
   *  for a particular completion entry.
   *
   *  Note that specifying tags and sets is optional: if no tag is specified upon creation,
@@ -41,19 +41,19 @@ trait CompletionTypes {
     * @param label tag label
     * @param score tag score (the higher the better, 0 by default)
     * @param description tag description (optional) - can be used for additional information e.g. for a tooltip
-    * @param kind tag kind (optional) - can be used e.g. to define visual style
+    * @param meta tag meta (optional) - can be used e.g. to define visual style
     */
-  case class CompletionTag(label: String, score: Int, description: Option[String], kind: Option[String]) {
-    def update(newTag: Option[String], newScore: Option[Int], newDescription: Option[String], newKind: Option[String]): CompletionTag =
+  case class CompletionTag(label: String, score: Int, description: Option[String], meta: Option[String]) {
+    def update(newTag: Option[String], newScore: Option[Int], newDescription: Option[String], newMeta: Option[String]): CompletionTag =
       copy(
         label = newTag.getOrElse(label),
         score = newScore.getOrElse(score),
         description = newDescription.map(Some(_)).getOrElse(description),
-        kind = newKind.map(Some(_)).getOrElse(kind)
+        meta = newMeta.map(Some(_)).getOrElse(meta)
       )
 
     private[CompletionTypes] def serializeJson: json4s.JObject = {
-      ("label" -> label) ~ ("score" -> score) ~ ("description" -> description) ~ ("kind" -> kind)
+      ("label" -> label) ~ ("score" -> score) ~ ("description" -> description) ~ ("meta" -> meta)
     }
 
     override def toString: String = pretty(render(serializeJson))
@@ -77,7 +77,7 @@ trait CompletionTypes {
     def label: String               = tag.label
     def score: Int                  = tag.score
     def description: Option[String] = tag.description
-    def kind: Option[String]        = tag.kind
+    def meta: Option[String]        = tag.meta
     def completionStrings: Seq[String] =
       completions.toSeq.sorted.map(_.value.toString)
 
@@ -119,14 +119,14 @@ trait CompletionTypes {
   /** Completion entry
     * @param value entry value (e.g. string literal)
     * @param score entry score (defines the order of entries within a set, the higher the better)
-    * @param kind entry kind (e.g. visual style)
+    * @param meta entry meta (e.g. visual style)
     */
-  case class Completion(value: Elems, score: Int = DefaultCompletionScore, kind: Option[String] = None) {
+  case class Completion(value: Elems, score: Int = DefaultCompletionScore, meta: Option[String] = None) {
     require(value.nonEmpty, "empty completion")
-    def updateKind(newKind: Option[String]): Completion =
-      copy(kind = newKind.map(Some(_)).getOrElse(kind))
+    def updateKind(newMeta: Option[String]): Completion =
+      copy(meta = newMeta.map(Some(_)).getOrElse(meta))
 
-    private[CompletionTypes] def serializeJson = ("value" -> value.toString()) ~ ("score" -> score) ~ ("kind" -> kind)
+    private[CompletionTypes] def serializeJson = ("value" -> value.toString()) ~ ("score" -> score) ~ ("meta" -> meta)
 
     def toJson: String = compact(render(serializeJson))
 
@@ -160,11 +160,11 @@ trait CompletionTypes {
         val isOffsetRequired =
           set.completions.map(_.score).exists(_ < set.score)
         if (isOffsetRequired)
-          set.completions.map(c => Completion(c.value, set.score + c.score, c.kind))
+          set.completions.map(c => Completion(c.value, set.score + c.score, c.meta))
         else set.completions
       }
       CompletionSet(
-        CompletionTag(left.tag.label, left.score.min(right.score), left.description, left.kind.orElse(right.kind)),
+        CompletionTag(left.tag.label, left.score.min(right.score), left.description, left.meta.orElse(right.meta)),
         offsetCompletions(left) ++ offsetCompletions(right)
       )
     }
@@ -210,7 +210,7 @@ trait CompletionTypes {
       val sortedEntries =
         allEntries
           .sortBy {
-            case (Completion(_, score, kind), CompletionTag(_, tagScore, _, _)) =>
+            case (Completion(_, score, meta), CompletionTag(_, tagScore, _, _)) =>
               (tagScore, score)
           }
           .reverse

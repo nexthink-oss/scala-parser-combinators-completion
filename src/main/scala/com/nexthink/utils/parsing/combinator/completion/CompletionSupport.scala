@@ -29,7 +29,7 @@ import scala.language.implicitConversions
   *  with `RegexParsers` to automatically obtain completion behavior for string literals.
   *
   *  A set of additional operators allow defining completions and specifying structural properties of completions
-  *  (tag, score, kind, etc.) for a `Parser`.
+  *  (tag, score, meta, etc.) for a `Parser`.
   *
   *  @author Jonas Chapuis
   */
@@ -153,11 +153,11 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       Parser(this,
              in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore), Some(tagDescription), None))
 
-    /** An operator to specify the completion tag, score, description and kind of a parser
+    /** An operator to specify the completion tag, score, description and meta of a parser
       * @param tag the completion tag
       * @param tagScore the completion tag score
       * @param tagDescription the completion tag description
-      * @param tagKind the completion tag kind
+      * @param tagKind the completion tag meta
       * @return wrapper `Parser` instance specifying completion tag
       */
     def %(tag: String, tagScore: Int, tagDescription: String, tagKind: String): Parser[T] =
@@ -173,7 +173,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     def %(tag: CompletionTag): Parser[T] =
       Parser(
         this,
-        in => updateCompletionsTag(this.completions(in), Some(tag.label), Some(tag.score), tag.description, tag.kind))
+        in => updateCompletionsTag(this.completions(in), Some(tag.label), Some(tag.score), tag.description, tag.meta))
 
     /** An operator to specify the completion tag description of a parser (empty by default)
       * @param tagDescription the completion description (to be used e.g. to add information to a completion entry)
@@ -182,19 +182,19 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     def %?(tagDescription: String): Parser[T] =
       Parser(this, in => updateCompletionsTag(this.completions(in), None, None, Some(tagDescription), None))
 
-    /** An operator to specify the completion tag kind of a parser (empty by default)
-      * @param tagKind the completion tag kind (to be used e.g. to specify the visual style for a completion tag in the menu)
-      * @return wrapper `Parser` instance specifying the completion tag kind
+    /** An operator to specify the completion tag meta of a parser (empty by default)
+      * @param tagMeta the completion tag meta-data (to be used e.g. to specify the visual style for a completion tag in the menu)
+      * @return wrapper `Parser` instance specifying the completion tag meta-data
       */
-    def %%(tagKind: String): Parser[T] =
-      Parser(this, in => updateCompletionsTag(this.completions(in), None, None, None, Some(tagKind)))
+    def %%(tagMeta: String): Parser[T] =
+      Parser(this, in => updateCompletionsTag(this.completions(in), None, None, None, Some(tagMeta)))
 
-    /** An operator to specify the kind for completions of a parser (empty by default)
-      * @param kind the completion kind (to be used e.g. to specify the visual style for a completion entry in the menu)
-      * @return wrapper `Parser` instance specifying the completion kind
+    /** An operator to specify the meta for completions of a parser (empty by default)
+      * @param meta the completion meta-data (to be used e.g. to specify the visual style for a completion entry in the menu)
+      * @return wrapper `Parser` instance specifying the completion meta-data
       */
-    def %-%(kind: String): Parser[T] =
-      Parser(this, in => updateCompletions(this.completions(in), Some(kind)))
+    def %-%(meta: String): Parser[T] =
+      Parser(this, in => updateCompletions(this.completions(in), Some(meta)))
 
     def flatMap[U](f: T => Parser[U]): Parser[U] =
       Parser(super.flatMap(f), completions)

@@ -23,14 +23,14 @@ class CompletionOperatorsTest {
     val score                       = 10
     val description                 = "some description"
     val tag                         = "some tag"
-    val kind                        = "some kind"
+    val meta                        = "some meta"
 
-    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score) %? description %% kind,
+    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score) %? description %% meta,
                            completions,
                            Some(tag),
                            Some(score),
                            Some(description),
-                           Some(kind))
+                           Some(meta))
 
     assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score, description),
                            completions,
@@ -39,35 +39,35 @@ class CompletionOperatorsTest {
                            Some(description),
                            None)
 
-    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score, description, kind),
+    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score, description, meta),
                            completions,
                            Some(tag),
                            Some(score),
                            Some(description),
-                           Some(kind))
+                           Some(meta))
 
     assertCompletionsMatch(
-      TestParser.someParser %> (completions: _*) % TestParser.CompletionTag(tag, score, Some(description), Some(kind)),
+      TestParser.someParser %> (completions: _*) % TestParser.CompletionTag(tag, score, Some(description), Some(meta)),
       completions,
       Some(tag),
       Some(score),
       Some(description),
-      Some(kind)
+      Some(meta)
     )
 
-    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % tag %? description % score %% kind,
+    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % tag %? description % score %% meta,
                            completions,
                            Some(tag),
                            Some(score),
                            Some(description),
-                           Some(kind))
+                           Some(meta))
 
-    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % tag % score %? description %% kind,
+    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % tag % score %? description %% meta,
                            completions,
                            Some(tag),
                            Some(score),
                            Some(description),
-                           Some(kind))
+                           Some(meta))
   }
 
   def assertCompletionsMatch[T](sut: TestParser.Parser[T],
@@ -75,7 +75,7 @@ class CompletionOperatorsTest {
                                 tag: Option[String],
                                 score: Option[Int],
                                 description: Option[String],
-                                kind: Option[String]): Unit = {
+                                meta: Option[String]): Unit = {
     // Act
     val result = TestParser.complete(sut, "")
 
@@ -85,7 +85,7 @@ class CompletionOperatorsTest {
     Assert.assertEquals(tag.getOrElse(""), completionSet.tag.label)
     Assert.assertEquals(score.getOrElse(0), completionSet.tag.score)
     Assert.assertEquals(description, completionSet.tag.description)
-    Assert.assertEquals(kind, completionSet.tag.kind)
+    Assert.assertEquals(meta, completionSet.tag.meta)
     Assert.assertEquals(completions.toSet, completionSet.completions.map(_.value))
   }
 

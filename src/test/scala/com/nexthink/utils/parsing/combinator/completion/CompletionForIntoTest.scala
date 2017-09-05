@@ -20,7 +20,7 @@ class CompletionForIntoTest {
   object TestParser extends RegexParsers with RegexCompletionSupport {
     val animalParser  = bear | lion
     val machineParser = "plane" | "car"
-    val test          = (animal | machine) >> { kind: String => if (kind == animal) animalParser else machineParser }
+    val test          = (animal | machine) >> { meta: String => if (meta == animal) animalParser else machineParser }
   }
 
   @Test

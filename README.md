@@ -228,8 +228,8 @@ Completing on the same expressions (`2`, `2+`, `(10*2`) now leads to the followi
 |`%`     |defines the completions tag|<code>("+" &#124; "-") % "operators"</code>|
 |`%`     |followed by an `Int`, defines the completion tag score|<code>("+" &#124; "-") % 10</code>|
 |`%?`    |defines the description of the completions tag|<code>("+" &#124; "-") %? "arithmetic operators"</code>|
-|`%%`    |defines the completions tag kind (can be used to encode properties for the tag, e.g. visual decorations)|<code>("+" &#124; "-") %% "style: highlight"</code>|
-|`%-%`   |defines the completion kind (can be used to encode properties for each completion entry, e.g. visual decorations)|<code>("+" %-% "style: highlight" &#124; "-")</code>|   
+|`%%`    |defines the completions tag meta-data (can be used to encode properties for the tag, e.g. visual decorations)|<code>("+" &#124; "-") %% "style: highlight"</code>|
+|`%-%`   |defines the completion meta-data (can be used to encode properties for each completion entry, e.g. visual decorations)|<code>("+" %-% "style: highlight" &#124; "-")</code>|   
 
 ## Fuzzy completion
 
