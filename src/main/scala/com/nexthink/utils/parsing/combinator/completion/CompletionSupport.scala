@@ -7,11 +7,13 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
-import java.io.StringReader
+import org.json4s.JValue
+import org.json4s.native.JsonMethods.compact
+import org.json4s.native.JsonMethods.render
 
-import scala.util.parsing.combinator.Parsers
-import scala.util.parsing.input.{CharSequenceReader, Positional}
 import scala.language.implicitConversions
+import scala.util.parsing.combinator.Parsers
+import scala.util.parsing.input.Positional
 
 // scalastyle:off method.name
 
@@ -175,24 +177,36 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       Parser(this, in => updateCompletionsTag(this.completions(in), None, None, Some(tagDescription), None))
 
     /** An operator to specify the completion tag meta-data of a parser (empty by default).
-      * Note that if the meta-data is encoded in JSON, it is automatically merged when combining two equivalent tags
-      * (i.e. bearing the same label, but with a different payload). This allows for more flexibility when defining the grammar:
-      * various parsers can return the same completion tags with an additive effect on the meta-data (and the entries).
       * @param tagMeta the completion tag meta-data (to be used e.g. to specify the visual style for a completion tag in the menu)
       * @return wrapper `Parser` instance specifying the completion tag meta-data
       */
     def %%(tagMeta: String): Parser[T] =
       Parser(this, in => updateCompletionsTag(this.completions(in), None, None, None, Some(tagMeta)))
 
+    /** An operator to specify the completion tag meta-data of a parser in JSON format (empty by default).
+      * JSON meta-data is automatically merged when combining two equivalent tags (i.e. bearing the same label, but with a different payload).
+      * This allows for more flexibility when defining the grammar: various parsers can return the same completion tags with
+      * an additive effect on the meta-data (and the entries).
+      * @param tagMeta the JValue for completion tag meta-data (to be used e.g. to specify the visual style for a completion tag in the menu)
+      * @return wrapper `Parser` instance specifying the completion tag meta-data
+      */
+    def %%(tagMeta: JValue): Parser[T] = %%(compact(render(tagMeta)))
+
     /** An operator to specify the meta-data for completions of a parser (empty by default)
-      * Note that if the meta-data is encoded in JSON, it is automatically merged when combining two equivalent tags
-      * (i.e. bearing the same label, but with a different payload). This allows for more flexibility when defining the grammar:
-      * various parsers can return the same completion entries with an additive effect on the meta-data.
       * @param meta the completion meta-data (to be used e.g. to specify the visual style for a completion entry in the menu)
       * @return wrapper `Parser` instance specifying the completion meta-data
       */
     def %-%(meta: String): Parser[T] =
       Parser(this, in => updateCompletions(this.completions(in), Some(meta)))
+
+    /** An operator to specify the meta-data for completions of a parser in JSON format (empty by default)
+      * Note that if the meta-data is encoded in JSON, it is automatically merged when combining two equivalent tags
+      * (i.e. bearing the same label, but with a different payload). This allows for more flexibility when defining the grammar:
+      * various parsers can return the same completion entries with an additive effect on the meta-data.
+      * @param meta the JValue for completion meta-data (to be used e.g. to specify the visual style for a completion entry in the menu)
+      * @return wrapper `Parser` instance specifying the completion meta-data
+      */
+    def %-%(meta: JValue): Parser[T] = %-%(compact(render(meta)))
 
     def flatMap[U](f: T => Parser[U]): Parser[U] =
       Parser(super.flatMap(f), completions)

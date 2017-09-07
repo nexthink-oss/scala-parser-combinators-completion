@@ -52,13 +52,16 @@ class CompletionTypesTest extends CompletionTypes {
     val merged = Completions(Seq(setA, setB)) | Completions(Seq(setAPrime, setC))
 
     // Assert
-    val mergedJsonMetadata = compact(render(("objects" -> Seq("devices", "users", "packages")) ~ ("themes" -> Seq("some", "other"))))
     assertArrayEquals(
       merged.allSets.toArray[AnyRef],
       Seq(
         CompletionSet(
           CompletionTag("A", 10, Some("description"), Some(compact(render(("type" -> "a-type") ~ ("style" -> "highlight"))))),
-          Set(Completion("a", 4), Completion("b", 1, Some(mergedJsonMetadata)), Completion("aa"))
+          Set(
+            Completion("a", 4),
+            Completion("b", 1, Some(compact(render(("objects" -> Seq("devices", "users", "packages")) ~ ("themes" -> Seq("some", "other")))))),
+            Completion("aa")
+          )
         ),
         setB,
         setC
