@@ -160,7 +160,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
           val completions = termsParsers$.complete(parser, substring)
           withClue(s"substring=$substring, term=$term, completions=$completions, terms=$terms") {
             whenever(completions.nonEmpty) {
-              completions.allSets.flatMap(_.completions).map(_.score).max should (be >= threshold or equal(0))
+              completions.allSets.flatMap(_.entries).map(_.score).max should (be >= threshold or equal(0))
             }
           }
         })

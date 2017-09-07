@@ -56,7 +56,7 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
       else
         completions.allSets
           .map(cSet => {
-            cSet.completions
+            cSet.entries
               .map(c => {
                 val completedInput = completeString(str, completions.position.column, c)
                 if (stop(new CharSequenceReader(completedInput)).successful) {

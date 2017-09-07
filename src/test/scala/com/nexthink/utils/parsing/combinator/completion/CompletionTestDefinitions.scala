@@ -29,7 +29,7 @@ trait CompletionTestParser extends Parsers with RegexCompletionSupport {
   def assertSetEquals(expected: AssertionSet, actual: CompletionSet): Unit =
     expected match {
       case default @ Default(_ *) => {
-        default.strings.zip(actual.completionStrings).foreach {
+        default.strings.zip(actual.stringEntries).foreach {
           case (e, a) => assertEquals(e, a)
         }
       }
@@ -37,7 +37,7 @@ trait CompletionTestParser extends Parsers with RegexCompletionSupport {
         assertEquals(name, actual.tag.label)
         assertEquals(score, actual.tag.score)
         assertEquals(desc, actual.tag.description)
-        named.strings.zip(actual.completionStrings).foreach {
+        named.strings.zip(actual.stringEntries).foreach {
           case (e, a) => assertEquals(e, a)
         }
       }

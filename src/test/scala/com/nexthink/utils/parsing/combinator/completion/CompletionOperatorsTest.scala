@@ -6,6 +6,8 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
+import java.util
+
 import org.junit.{Assert, Test}
 
 import scala.util.parsing.combinator.Parsers
@@ -19,7 +21,7 @@ class CompletionOperatorsTest {
   @Test
   def completionSpecifiedWithBuilderIsCorrect(): Unit = {
     // Arrange
-    val completions: Seq[Seq[Char]] = Seq("one", "two", "three")
+    val completions: Seq[Seq[Char]] = Seq("a", "b", "c")
     val score                       = 10
     val description                 = "some description"
     val tag                         = "some tag"
@@ -86,23 +88,7 @@ class CompletionOperatorsTest {
     Assert.assertEquals(score.getOrElse(0), completionSet.tag.score)
     Assert.assertEquals(description, completionSet.tag.description)
     Assert.assertEquals(meta, completionSet.tag.meta)
-    Assert.assertEquals(completions.toSet, completionSet.completions.map(_.value))
-  }
-
-  @Test
-  def unioningCompletionSetsScoresMergedItemsOffsetBySetScore(): Unit = {
-    // Arrange
-    val a   = Seq(TestParser.Completion("one", 10), TestParser.Completion("two"))
-    val b   = Seq(TestParser.Completion("three", 5), TestParser.Completion("five"))
-    val c   = Seq(TestParser.Completion("four"))
-    val sut = TestParser.someParser %> a % 10 | TestParser.someParser %> b | TestParser.someParser %> c % 3
-
-    // Act
-    val result = TestParser.complete(sut, "")
-
-    // Assert
-    Assert.assertArrayEquals(Seq("one", "two", "three", "four", "five").toArray[AnyRef],
-                             result.completionStrings.toArray[AnyRef])
+    Assert.assertTrue(completions == completionSet.sortedEntries.map(_.value))
   }
 
   @Test
