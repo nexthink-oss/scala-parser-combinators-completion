@@ -17,13 +17,17 @@ class CompletionTypesTest extends CompletionTypes {
 
   val setA = CompletionSet(
     CompletionTag("A", 10, Some("description"), Some(compact(render("type" -> "a-type")))),
-    Set(Completion("a", 2), Completion("b", 1, Some(compact(render(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some")))))))
+    Set(Completion("a", 2, Some("meta1")), Completion("b", 1, Some(compact(render(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some")))))))
   )
   val setB = CompletionSet(CompletionTag("B", 5), Set(Completion("c", 4), Completion("d", 3)))
   val setC = CompletionSet("C", Completion("e", 10))
   val setAPrime = CompletionSet(
     CompletionTag("A", 10, None, Some(compact(render("style" -> "highlight")))),
-    Set(Completion("a", 4), Completion("b", 1, Some(compact(render(("objects" -> Seq("users", "packages")) ~ ("themes" -> Seq("other")))))), Completion("aa"))
+    Set(
+      Completion("a", 4, Some("meta2")),
+      Completion("b", 1, Some(compact(render(("objects" -> Seq("users", "packages")) ~ ("themes" -> Seq("other")))))),
+      Completion("aa")
+    )
   )
 
   @Test
@@ -58,7 +62,7 @@ class CompletionTypesTest extends CompletionTypes {
         CompletionSet(
           CompletionTag("A", 10, Some("description"), Some(compact(render(("type" -> "a-type") ~ ("style" -> "highlight"))))),
           Set(
-            Completion("a", 4),
+            Completion("a", 4, Some("meta1, meta2")),
             Completion("b", 1, Some(compact(render(("objects" -> Seq("devices", "users", "packages")) ~ ("themes" -> Seq("some", "other")))))),
             Completion("aa")
           )

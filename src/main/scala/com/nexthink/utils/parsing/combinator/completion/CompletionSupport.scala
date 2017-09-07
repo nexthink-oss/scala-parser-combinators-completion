@@ -177,6 +177,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       Parser(this, in => updateCompletionsTag(this.completions(in), None, None, Some(tagDescription), None))
 
     /** An operator to specify the completion tag meta-data of a parser (empty by default).
+      * Note that meta-data is merged with comma separations when combining two equivalent entries.
       * @param tagMeta the completion tag meta-data (to be used e.g. to specify the visual style for a completion tag in the menu)
       * @return wrapper `Parser` instance specifying the completion tag meta-data
       */
@@ -192,7 +193,8 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       */
     def %%(tagMeta: JValue): Parser[T] = %%(compact(render(tagMeta)))
 
-    /** An operator to specify the meta-data for completions of a parser (empty by default)
+    /** An operator to specify the meta-data for completions of a parser (empty by default).
+      * Note that meta-data is merged with comma separations when combining two equivalent entries.
       * @param meta the completion meta-data (to be used e.g. to specify the visual style for a completion entry in the menu)
       * @return wrapper `Parser` instance specifying the completion meta-data
       */
@@ -200,9 +202,9 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       Parser(this, in => updateCompletions(this.completions(in), Some(meta)))
 
     /** An operator to specify the meta-data for completions of a parser in JSON format (empty by default)
-      * Note that if the meta-data is encoded in JSON, it is automatically merged when combining two equivalent tags
+      * Note that if the meta-data is encoded in JSON, it is automatically merged when combining two equivalent entries
       * (i.e. bearing the same label, but with a different payload). This allows for more flexibility when defining the grammar:
-      * various parsers can return the same completion entries with an additive effect on the meta-data.
+      *  various parsers can return the same completion entries with an additive effect on the meta-data.
       * @param meta the JValue for completion meta-data (to be used e.g. to specify the visual style for a completion entry in the menu)
       * @return wrapper `Parser` instance specifying the completion meta-data
       */

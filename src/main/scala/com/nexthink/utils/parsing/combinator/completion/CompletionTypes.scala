@@ -162,11 +162,12 @@ trait CompletionTypes {
     override def toString: String = pretty(render(serializeJson))
     def toJson: String            = compact(render(serializeJson))
 
+
     private def mergeMetaData(left: Option[String], right: Option[String]) = (left, right) match {
       case (Some(l), Some(r)) =>
         (parseOpt(l), parseOpt(r)) match {
           case (Some(lJson), Some(rJson)) => Some(compact(render(lJson merge rJson)))
-          case _                          => Some(l + r)
+          case _                          => Some(Seq(l, r).mkString(", "))
         }
       case (Some(l), None) => Some(l)
       case (None, Some(r)) => Some(r)
