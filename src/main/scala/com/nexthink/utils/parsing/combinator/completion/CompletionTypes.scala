@@ -8,10 +8,12 @@
 package com.nexthink.utils.parsing.combinator.completion
 
 import org.json4s
+import org.json4s.{JArray, JValue}
 
 import scala.util.parsing.input.{NoPosition, Position}
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
+
 import scala.collection.immutable
 
 /**  Collection of data types allowing definition of structured parser completions.
@@ -33,6 +35,7 @@ import scala.collection.immutable
   */
 trait CompletionTypes {
   type Elem
+  type Elems = Seq[Elem]
 
   val DefaultCompletionTag   = ""
   val DefaultCompletionScore = 0
@@ -57,7 +60,7 @@ trait CompletionTypes {
     }
 
     override def toString: String = pretty(render(serializeJson))
-    def toJson: String            = compact(render(serializeJson))
+    def toJson: JValue            = serializeJson
   }
 
   case object CompletionTag {
@@ -86,7 +89,7 @@ trait CompletionTypes {
       ("tag" -> tag.serializeJson) ~ ("completions" -> entries.map(_.serializeJson).toList)
 
     override def toString: String = pretty(render(serializeJson))
-    def toJson: String            = compact(render(serializeJson))
+    def toJson: JValue            = serializeJson
   }
 
   case object CompletionSet {
@@ -119,9 +122,9 @@ trait CompletionTypes {
 
     def apply(completions: Traversable[Elems]): CompletionSet =
       CompletionSet(CompletionTag.Default, completions.map(c => c -> Completion(c)).toSeq)
-  }
 
-  type Elems = Seq[Elem]
+    implicit def orderingByScoreAndThenAlphabetical: Ordering[CompletionSet] = Ordering.by(s => (-s.score, s.label))
+  }
 
   /** Completion entry
     * @param value entry value (e.g. string literal)
@@ -153,15 +156,15 @@ trait CompletionTypes {
     def isEmpty: Boolean                               = sets.isEmpty
     def nonEmpty: Boolean                              = !isEmpty
     def setWithTag(tag: String): Option[CompletionSet] = sets.get(tag)
-    def allSets: Iterable[CompletionSet]               = sets.values
+    def allSets: Iterable[CompletionSet]               = sets.values.toSeq.sorted
     def allCompletions: Iterable[Completion]           = allSets.flatMap(_.sortedEntries)
     def defaultSet: Option[CompletionSet]              = sets.get("")
 
     private def serializeJson = ("position" -> (("line" -> position.line) ~ ("column" -> position.column))) ~ ("sets" -> allSets.map(_.serializeJson))
 
     override def toString: String = pretty(render(serializeJson))
-    def toJson: String            = compact(render(serializeJson))
-
+    def toJson: JValue            = serializeJson
+    def setsToJson: JArray        = allSets.map(_.serializeJson)
 
     private def mergeMetaData(left: Option[String], right: Option[String]) = (left, right) match {
       case (Some(l), Some(r)) =>

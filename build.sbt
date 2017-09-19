@@ -1,7 +1,7 @@
 name := "scala-parser-combinators-completion"
 organization := "com.nexthink"
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
-version := "1.0.4"
+version := "1.0.5"
 scalaVersion := "2.12.2"
 bintrayRepository := "maven"
 bintrayVcsUrl := Some("jchapuis@github.com:jchapuis/scala-parser-combinators-completion")
