@@ -41,7 +41,7 @@ class CompletionExpansionSupportTest {
     val jumpsOver                = "which jumps over the lazy" % "action"
     val jumpsOverDogOrCat        = jumpsOver ~ ("dog" | "cat") % "animal" %? "dogs and cats" % 10
     lazy val parser              = jumpsOverDogOrCat | jumpsOverDogOrCat ~ which()
-    def which(): Parser[Any]     = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat)
+    def which(): Parser[Any]     = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat) %%% "expansions"
     lazy val infiniteDogsAndCats = fox ~ which
   }
 
@@ -71,6 +71,12 @@ class CompletionExpansionSupportTest {
         )),
       completions
     )
+  }
+
+  @Test
+  def infiniteExpressionExpansionIncludesGlobalMeta(): Unit = {
+    val completions = InfiniteExpressionParser.complete(InfiniteExpressionParser.infiniteDogsAndCats, "the quick brown fox  ")
+    Assert.assertEquals(Some("expansions"), completions.meta)
   }
 
   @Test

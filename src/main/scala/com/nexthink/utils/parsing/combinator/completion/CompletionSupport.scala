@@ -117,7 +117,11 @@ trait CompletionSupport extends Parsers with CompletionTypes {
         this,
         in => {
           val completions = this.completions(in)
-          Completions(completions.position, completions.sets.mapValues(s => CompletionSet(s.tag, s.entries.toList.sortBy(_.score).reverse.take(n).toSet)).toSeq)
+          Completions(
+            completions.position,
+            completions.meta,
+            completions.sets.mapValues(s => CompletionSet(s.tag, s.entries.toList.sortBy(_.score).reverse.take(n).toSet)).toSeq
+          )
         }
       )
 
@@ -126,14 +130,14 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return wrapper `Parser` instance specifying the completion tag
       */
     def %(tag: String): Parser[T] =
-      Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), None, None, None))
+      Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag)))
 
     /** An operator to specify the completions tag score of a parser (0 by default)
       * @param tagScore the completion tag score (to be used e.g. to order sections in a completion menu)
       * @return wrapper `Parser` instance specifying the completion tag score
       */
     def %(tagScore: Int): Parser[T] =
-      Parser(this, in => updateCompletionsTag(this.completions(in), None, Some(tagScore), None, None))
+      Parser(this, in => updateCompletionsTag(this.completions(in), None, Some(tagScore)))
 
     /** An operator to specify the completion tag and score of a parser
       * @param tag the completion tag
@@ -141,7 +145,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return wrapper `Parser` instance specifying the completion tag
       */
     def %(tag: String, tagScore: Int): Parser[T] =
-      Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore), None, None))
+      Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore)))
 
     /** An operator to specify the completion tag, score and description of a parser
       * @param tag the completion tag
@@ -150,17 +154,17 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return wrapper `Parser` instance specifying completion tag
       */
     def %(tag: String, tagScore: Int, tagDescription: String): Parser[T] =
-      Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore), Some(tagDescription), None))
+      Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore), Some(tagDescription)))
 
     /** An operator to specify the completion tag, score, description and meta of a parser
       * @param tag the completion tag
       * @param tagScore the completion tag score
       * @param tagDescription the completion tag description
-      * @param tagKind the completion tag meta
+      * @param tagMeta the completion tag meta
       * @return wrapper `Parser` instance specifying completion tag
       */
-    def %(tag: String, tagScore: Int, tagDescription: String, tagKind: String): Parser[T] =
-      Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore), Some(tagDescription), Some(tagKind)))
+    def %(tag: String, tagScore: Int, tagDescription: String, tagMeta: String): Parser[T] =
+      Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore), Some(tagDescription), Some(tagMeta)))
 
     /** An operator to specify the completion tag
       * @param tag the completion tag
@@ -174,7 +178,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return wrapper `Parser` instance specifying the completion description
       */
     def %?(tagDescription: String): Parser[T] =
-      Parser(this, in => updateCompletionsTag(this.completions(in), None, None, Some(tagDescription), None))
+      Parser(this, in => updateCompletionsTag(this.completions(in), None, None, Some(tagDescription)))
 
     /** An operator to specify the completion tag meta-data of a parser (empty by default).
       * Note that meta-data is merged with comma separations when combining two equivalent entries.
@@ -191,7 +195,8 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagMeta the JValue for completion tag meta-data (to be used e.g. to specify the visual style for a completion tag in the menu)
       * @return wrapper `Parser` instance specifying the completion tag meta-data
       */
-    def %%(tagMeta: JValue): Parser[T] = %%(compact(render(tagMeta)))
+    def %%(tagMeta: JValue): Parser[T] =
+      Parser(this, in => updateCompletionsSets(this.completions(in), set => CompletionSet(set.tag.updateMeta(tagMeta), set.completions)))
 
     /** An operator to specify the meta-data for completions of a parser (empty by default).
       * Note that meta-data is merged with comma separations when combining two equivalent entries.
@@ -199,7 +204,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return wrapper `Parser` instance specifying the completion meta-data
       */
     def %-%(meta: String): Parser[T] =
-      Parser(this, in => updateCompletions(this.completions(in), Some(meta)))
+      Parser(this, in => updateCompletionsSets(this.completions(in), set => CompletionSet(set.tag, set.entries.map(e => e.updateMeta(meta)))))
 
     /** An operator to specify the meta-data for completions of a parser in JSON format (empty by default)
       * Note that if the meta-data is encoded in JSON, it is automatically merged when combining two equivalent entries
@@ -209,6 +214,26 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return wrapper `Parser` instance specifying the completion meta-data
       */
     def %-%(meta: JValue): Parser[T] = %-%(compact(render(meta)))
+
+    /**
+      * An operator to specify the meta-data for the whole set of completions (empty by default)
+      * Note that meta-data is merged with comma separations when combining two equivalent entries.
+      * @param globalMeta the meta-data (to be used e.g. to specify the visual style for the completion menu)
+      * @return wrapper `Parser` instance specifying the completions meta-data
+      */
+    def %%%(globalMeta: String): Parser[T] =
+      Parser(this, in => this.completions(in).updateMeta(globalMeta))
+
+    /**
+      * An operator to specify the meta-data for the whole set of completions (empty by default)
+      * Note that if the meta-data is encoded in JSON, it is automatically merged when combining multiple completion sets.
+      * This allows for more flexibility when defining the grammar: various parsers can define the global completion meta-data
+      * with an additive effect.
+      * @param globalMeta the JValue for completions meta-data (to be used e.g. to specify the visual style for the completion menu)
+      * @return wrapper `Parser` instance specifying the completions meta-data
+      */
+    def %%%(globalMeta: JValue): Parser[T] =
+      Parser(this, in => this.completions(in).updateMeta(globalMeta))
 
     def flatMap[U](f: T => Parser[U]): Parser[U] =
       Parser(super.flatMap(f), completions)
@@ -233,6 +258,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
 
     private def updateCompletionsSets(completions: Completions, updateSet: CompletionSet => CompletionSet) = {
       Completions(completions.position,
+                  completions.meta,
                   completions.sets.values
                     .map(updateSet)
                     .map(s => s.tag.label -> s)
@@ -240,19 +266,19 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     }
 
     private def updateCompletionsTag(completions: Completions,
-                                     newTagLabel: Option[String],
-                                     newTagScore: Option[Int],
-                                     newTagDescription: Option[String],
-                                     newTagKind: Option[String]) = {
+                                     newTagLabel: Option[String] = None,
+                                     newTagScore: Option[Int] = None,
+                                     newTagDescription: Option[String] = None,
+                                     newTagKind: Option[String] = None) = {
       def updateSet(existingSet: CompletionSet) =
         CompletionSet(existingSet.tag.update(newTagLabel, newTagScore, newTagDescription, newTagKind), existingSet.completions)
 
       updateCompletionsSets(completions, updateSet)
     }
 
-    private def updateCompletions(completions: Completions, newCompletionKind: Option[String]) = {
+    private def updateCompletionsMeta(completions: Completions, newMeta: String) = {
       def updateSet(existingSet: CompletionSet) =
-        CompletionSet(existingSet.tag, existingSet.entries.map(e => e.updateKind(newCompletionKind)))
+        CompletionSet(existingSet.tag, existingSet.entries.map(e => e.updateMeta(newMeta)))
       updateCompletionsSets(completions, updateSet)
     }
 

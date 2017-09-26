@@ -94,15 +94,17 @@ class CompletionOperatorsTest {
   @Test
   def topCompletionsLimitsCompletionsAccordingToScore(): Unit = {
     // Arrange
+    val meta = "meta"
     val completions = Seq("one", "two", "three", "four").zipWithIndex.map {
       case (c, s) => TestParser.Completion(c, s)
     }
-    val sut = (TestParser.someParser %> completions).topCompletions(2)
+    val sut = (TestParser.someParser %> completions %%% meta).topCompletions(2)
 
     // Act
     val result = TestParser.complete(sut, "")
 
     // Assert
     Assert.assertArrayEquals(Seq("four", "three").toArray[AnyRef], result.completionStrings.toArray[AnyRef])
+    Assert.assertEquals(Some(meta), result.meta)
   }
 }

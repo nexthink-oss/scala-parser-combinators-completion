@@ -39,8 +39,8 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
       in => {
         lazy val isAtInputEnd = dropAnyWhiteSpace(in).atEnd
         if (!onlyAtInputEnd || isAtInputEnd) {
-          val Completions(_, sets) = exploreCompletions(p, limiter, in)
-          Completions(OffsetPosition(in.source, handleWhiteSpace(in)), sets)
+          val Completions(_, meta, sets) = exploreCompletions(p, limiter, in)
+          Completions(OffsetPosition(in.source, handleWhiteSpace(in)), meta, sets)
         } else
           p.completions(in)
       }

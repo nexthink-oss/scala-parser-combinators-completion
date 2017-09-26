@@ -16,16 +16,17 @@ class CompletionTypesTest extends CompletionTypes {
   override type Elem = Char
 
   val setA = CompletionSet(
-    CompletionTag("A", 10, Some("description"), Some(compact(render("type" -> "a-type")))),
-    Set(Completion("a", 2, Some("meta1")), Completion("b", 1, Some(compact(render(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some")))))))
+    CompletionTag("A", 10, "description").updateMeta("type" -> "a-type"),
+    Set(Completion("a", 2, Some("meta1")), Completion("b", 1).updateMeta(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some"))))
   )
+
   val setB = CompletionSet(CompletionTag("B", 5), Set(Completion("c", 4), Completion("d", 3)))
   val setC = CompletionSet("C", Completion("e", 10))
   val setAPrime = CompletionSet(
-    CompletionTag("A", 10, None, Some(compact(render("style" -> "highlight")))),
+    CompletionTag("A", 10).updateMeta("style" -> "highlight"),
     Set(
       Completion("a", 4, Some("meta2")),
-      Completion("b", 1, Some(compact(render(("objects" -> Seq("users", "packages")) ~ ("themes" -> Seq("other")))))),
+      Completion("b", 1).updateMeta(("objects" -> Seq("users", "packages")) ~ ("themes" -> Seq("other"))),
       Completion("aa")
     )
   )
@@ -53,17 +54,18 @@ class CompletionTypesTest extends CompletionTypes {
   @Test
   def completionsAtSamePositionAreMerged(): Unit = {
     // Act
-    val merged = Completions(Seq(setA, setB)) | Completions(Seq(setAPrime, setC))
+    val merged = Completions(Seq(setA, setB)).updateMeta("context" -> Seq("contextA")) | Completions(Seq(setAPrime, setC))
+      .updateMeta("context" -> Seq("contextB"))
 
     // Assert
     assertArrayEquals(
       merged.allSets.toArray[AnyRef],
       Seq(
         CompletionSet(
-          CompletionTag("A", 10, Some("description"), Some(compact(render(("type" -> "a-type") ~ ("style" -> "highlight"))))),
+          CompletionTag("A", 10, "description").updateMeta(("type" -> "a-type") ~ ("style" -> "highlight")),
           Set(
             Completion("a", 4, Some("meta1, meta2")),
-            Completion("b", 1, Some(compact(render(("objects" -> Seq("devices", "users", "packages")) ~ ("themes" -> Seq("some", "other")))))),
+            Completion("b", 1).updateMeta(("objects" -> Seq("devices", "users", "packages")) ~ ("themes" -> Seq("some", "other"))),
             Completion("aa")
           )
         ),
@@ -71,6 +73,7 @@ class CompletionTypesTest extends CompletionTypes {
         setC
       ).toArray[AnyRef]
     )
+    assertEquals(Some(compact(render("context" -> Seq("contextA", "contextB")))), merged.meta)
   }
 
   @Test
