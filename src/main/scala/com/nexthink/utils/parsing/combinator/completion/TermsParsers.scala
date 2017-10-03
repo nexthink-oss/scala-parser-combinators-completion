@@ -74,28 +74,32 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
 
   sealed private class TermsParser(trie: PrefixMap[String], maxCompletionsCount: Int) extends Parser[String] {
     override def apply(in: Input): ParseResult[String] = {
-      val start = dropAnyWhiteSpace(in)
-      val (terms, finalPosition) =
-        findAllMatchingTerms(start, start.offset, trie)
-      terms.lastOption match {
-        case Some((term, position)) => Success(term, in.drop(position - in.offset))
-        case None =>
+      tryParse(in) match {
+        case (Some(MatchingTerm(term, position)), _) => Success(term, in.drop(position - in.offset))
+        case (None, finalPosition) =>
           if (finalPosition == in.source.length) {
-            Failure(s"expected term but end of source reached", in.drop(finalPosition - in.offset))
+            Failure("expected term but end of source reached", in.drop(finalPosition - in.offset))
           } else {
-            Failure(s"no term found starting with ${subSequence(start, finalPosition)}", in.drop(finalPosition - in.offset))
+            Failure(s"no term found starting with ${subSequence(dropAnyWhiteSpace(in), finalPosition)}", in.drop(finalPosition - in.offset))
           }
       }
     }
 
     override def completions(in: Input): Completions = {
-      apply(in) match {
-        case Success(_, _) => Completions.empty
-        case NoSuccess(_, _) =>
+      tryParse(in) match {
+        case (Some(_), _) => Completions.empty
+        case (None, _) =>
           val start = dropAnyWhiteSpace(in)
           val terms = alphabeticalCompletions(findAllTermsWithPrefix(start, start.offset, trie), maxCompletionsCount)
           Completions(in.pos, terms)
       }
+    }
+
+    protected def tryParse(in: Input): (Option[MatchingTerm], Int) = {
+      val start = dropAnyWhiteSpace(in)
+      val (terms, finalPosition) =
+        findAllMatchingTerms(start, start.offset, trie)
+      (terms.lastOption, finalPosition)
     }
   }
 
@@ -149,9 +153,9 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       extends TermsParser(trie, maxCompletionsCount) {
 
     override def completions(in: Input): Completions = {
-      apply(in) match {
-        case Success(_, _) => Completions.empty
-        case NoSuccess(_, _) =>
+      tryParse(in) match {
+        case (Some(_), _) => Completions.empty
+        case (None, _) =>
           val start = dropAnyWhiteSpace(in)
           if (start.atEnd) {
             Completions(in.pos, completionsWhenInputEmpty)

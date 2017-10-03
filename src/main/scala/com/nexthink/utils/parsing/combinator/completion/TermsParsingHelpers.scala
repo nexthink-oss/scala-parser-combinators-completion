@@ -23,13 +23,15 @@ trait TermsParsingHelpers { this: RegexParsers =>
     reader.source.subSequence(start, end).toString
   private def lastPosition[T](reader: Reader[T]): Int = reader.source.length
 
-  protected def findAllMatchingTerms(in: Input, pos: Int, map: PrefixMap[String]): (Stream[(String, Int)], Int) = {
-    def findAllMatchingTermsIter(in: Input, pos: Int, map: PrefixMap[String], prevMatches: Stream[(String, Int)]): (Stream[(String, Int)], Int) = {
+  case class MatchingTerm(term: String, position: Int)
+
+  protected def findAllMatchingTerms(in: Input, pos: Int, map: PrefixMap[String]): (Stream[MatchingTerm], Int) = {
+    def findAllMatchingTermsIter(in: Input, pos: Int, map: PrefixMap[String], prevMatches: Stream[MatchingTerm]): (Stream[MatchingTerm], Int) = {
       lazy val nextSuffixChar = charAtPosition(in, pos)
       if (handleWhiteSpace(in.source, pos) < lastPosition(in) && map.hasSuffix(nextSuffixChar)) {
-        findAllMatchingTermsIter(in, pos + 1, map.withPrefix(nextSuffixChar), prevMatches ++ map.value.map((_, pos)))
+        findAllMatchingTermsIter(in, pos + 1, map.withPrefix(nextSuffixChar), prevMatches ++ map.value.map(MatchingTerm(_, pos)))
       } else {
-        (prevMatches ++ map.value.map((_, pos)), pos)
+        (prevMatches ++ map.value.map(MatchingTerm(_, pos)), pos)
       }
     }
     findAllMatchingTermsIter(in, pos, map, Stream())
