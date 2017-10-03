@@ -7,10 +7,10 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
-import com.nexthink.utils.collections.PrefixMap
+import com.nexthink.utils.collections.{Trie, PrefixMap}
 import com.nexthink.utils.parsing.distance.DiceSorensenDistance.diceSorensenSimilarity
 import com.nexthink.utils.parsing.distance._
-
+import com.nexthink.utils.collections.lazyQuicksort
 import scala.util.parsing.combinator.RegexParsers
 
 /**
@@ -65,55 +65,46 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
 
   private object TermsParser {
     def apply(terms: Seq[String], maxCompletionsCount: Int): TermsParser = {
-      val trie = PrefixMap(normalizedTerms(terms).zip(trimmedNonEmptyTerms(terms)).map {
+      val trie = Trie(normalizedTerms(terms).zip(trimmedNonEmptyTerms(terms)).map {
         case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
       }: _*)
       new TermsParser(trie, maxCompletionsCount)
     }
   }
 
-  sealed private class TermsParser(trie: PrefixMap[String], maxCompletionsCount: Int) extends Parser[String] {
+  sealed private class TermsParser(trie: Trie, maxCompletionsCount: Int) extends Parser[String] {
     override def apply(in: Input): ParseResult[String] = {
-      tryParse(in) match {
-        case (Some(MatchingTerm(term, position)), _) => Success(term, in.drop(position - in.offset))
-        case (None, finalPosition) =>
+      val (terms, finalPosition) = tryParse(in)
+      val next                   = in.drop(finalPosition - in.offset)
+      terms.lastOption match {
+        case Some(term) => Success(term, next)
+        case None =>
           if (finalPosition == in.source.length) {
-            Failure("expected term but end of source reached", in.drop(finalPosition - in.offset))
+            Failure("expected term but end of source reached", next)
           } else {
-            Failure(s"no term found starting with ${subSequence(dropAnyWhiteSpace(in), finalPosition)}", in.drop(finalPosition - in.offset))
+            Failure(s"no term found starting with ${subSequence(dropAnyWhiteSpace(in), finalPosition)}", next)
           }
       }
     }
 
     override def completions(in: Input): Completions = {
-      tryParse(in) match {
-        case (Some(_), _) => Completions.empty
-        case (None, _) =>
-          val start = dropAnyWhiteSpace(in)
-          val terms = alphabeticalCompletions(findAllTermsWithPrefix(start, start.offset, trie), maxCompletionsCount)
-          Completions(in.pos, terms)
+      if (tryParse(in)._1.nonEmpty)
+        Completions.empty
+      else {
+        val start = dropAnyWhiteSpace(in)
+        val possibleTerms = alphabeticalCompletions(findAllTermsWithPrefix(start, start.offset, trie), maxCompletionsCount)
+        Completions(in.pos, possibleTerms)
       }
     }
 
-    protected def tryParse(in: Input): (Option[MatchingTerm], Int) = {
+    protected def tryParse(in: Input): (Seq[String], Int) = {
       val start = dropAnyWhiteSpace(in)
-      val (terms, finalPosition) =
-        findAllMatchingTerms(start, start.offset, trie)
-      (terms.lastOption, finalPosition)
+      findAllMatchingTerms(start, start.offset, trie)
     }
   }
 
   private def trimmedNonEmptyTerms(terms: Seq[String]) = terms.map(_.trim()).filter(_.nonEmpty)
   private def normalizedTerms(terms: Seq[String])      = terms.map(_.toLowerCase)
-
-  private def lazyQuicksort[A](xs: Stream[A])(implicit o: Ordering[A]): Stream[A] = {
-    import o._
-    if (xs.isEmpty) xs
-    else {
-      val (smaller, bigger) = xs.tail.partition(_ < xs.head)
-      lazyQuicksort(smaller) #::: xs.head #:: lazyQuicksort(bigger)
-    }
-  }
 
   private def alphabeticalCompletions(terms: Iterable[String], maxCompletionsCount: Int): CompletionSet =
     CompletionSet(
@@ -137,7 +128,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
             tokenizeWords(normalizedTerm).flatMap(trigramsWithAffixing).map(trigram => trigram -> originalTerm)
         }
       val ngramMap = PrefixMap(trigramTermPairs.groupBy(_._1).mapValues(_.map(_._2).toArray).toSeq.seq: _*)
-      val trie = PrefixMap(normalized.zip(originals).map {
+      val trie = Trie(normalized.zip(originals).map {
         case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
       }: _*)
       new FuzzyParser(completionsWhenInputEmpty, ngramMap, trie, similarityMeasure, similarityThreshold, maxCompletionsCount)
@@ -146,22 +137,22 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
 
   sealed private class FuzzyParser private (completionsWhenInputEmpty: CompletionSet,
                                             ngramMap: PrefixMap[Array[String]],
-                                            trie: PrefixMap[String],
+                                            trie: Trie,
                                             similarityMeasure: (String, String) => Double,
                                             similarityThreshold: Int,
                                             maxCompletionsCount: Int)
       extends TermsParser(trie, maxCompletionsCount) {
 
     override def completions(in: Input): Completions = {
-      tryParse(in) match {
-        case (Some(_), _) => Completions.empty
-        case (None, _) =>
-          val start = dropAnyWhiteSpace(in)
-          if (start.atEnd) {
-            Completions(in.pos, completionsWhenInputEmpty)
-          } else {
-            fuzzyCompletions(start)
-          }
+      if (tryParse(in)._1.nonEmpty)
+        Completions.empty
+      else {
+        val start = dropAnyWhiteSpace(in)
+        if (start.atEnd) {
+          Completions(in.pos, completionsWhenInputEmpty)
+        } else {
+          fuzzyCompletions(start)
+        }
       }
     }
 

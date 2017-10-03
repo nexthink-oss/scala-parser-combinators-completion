@@ -79,27 +79,26 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completions
       */
     def %>(completions: Elems*): Parser[T] =
-      %>(completions.map(el => Completion(el)))
+      %>(CompletionSet(completions.map(el => Completion(el))))
 
     /** An operator to specify completion of a parser
       * @param completion completion for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completion
       */
-    def %>(completion: Completion): Parser[T] =
-      %>(Set(completion))
+    def %>(completion: Completion): Parser[T] = %>(CompletionSet(completion))
 
     /** An operator to specify completions of a parser
       * @param completions possible completions for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completions
       */
-    def %>(completions: Iterable[Completion]): Parser[T] =
-      Parser(this, in => {
-        this(in) match {
-          case Failure(_, rest) if rest.atEnd =>
-            Completions(rest.pos, CompletionSet(completions))
-          case _ => Completions.empty
-        }
-      })
+    def %>(completions: CompletionSet): Parser[T] =
+      Parser(this,
+             in =>
+               this(in) match {
+                 case Failure(_, rest) if rest.atEnd =>
+                   Completions(rest.pos, completions)
+                 case _ => Completions.empty
+             })
 
     /** An operator to specify completions of a parser
       * @param completioner function of input to completions

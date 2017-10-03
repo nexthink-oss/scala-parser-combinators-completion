@@ -48,7 +48,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     val terms  = termsParsers$.oneOfTerms(examples)
     val result = termsParsers$.parse(terms, "skype h")
     result.successful shouldBe true
-    result.next.pos.column shouldBe 6
+    result.next.pos.column shouldBe 8
   }
 
   property("oneOfTermsFuzzy completions with concrete examples") {

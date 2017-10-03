@@ -98,7 +98,7 @@ class CompletionOperatorsTest {
     val completions = Seq("one", "two", "three", "four").zipWithIndex.map {
       case (c, s) => TestParser.Completion(c, s)
     }
-    val sut = (TestParser.someParser %> completions %%% meta).topCompletions(2)
+    val sut = (TestParser.someParser %> TestParser.CompletionSet(completions) %%% meta).topCompletions(2)
 
     // Act
     val result = TestParser.complete(sut, "")

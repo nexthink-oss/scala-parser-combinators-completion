@@ -11,6 +11,7 @@ import org.json4s
 import org.json4s.{JArray, JValue}
 
 import scala.util.parsing.input.{NoPosition, Position}
+import com.nexthink.utils.collections.lazyQuicksort
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 
@@ -222,17 +223,13 @@ trait CompletionTypes {
         .toList
 
     def takeTop(count: Int): Completions = {
-      val allEntries = allSets
-        .flatMap(s => s.completions.values.map((_, s.tag)))
-        .toList
+      val allEntries = allSets.toStream.flatMap(s => s.entries.toStream.map((_, s.tag)))
       val sortedEntries =
-        allEntries
-          .sortBy {
+        lazyQuicksort(allEntries)(Ordering.by{
             case (Completion(_, score, _), CompletionTag(_, tagScore, _, _)) =>
-              (tagScore, score)
-          }
-          .reverse
-          .take(count)
+              (-tagScore, -score)
+          })
+          .take(count).toList
       val regroupedSets = sortedEntries
         .groupBy { case (_, tag) => tag }
         .map {
