@@ -215,7 +215,7 @@ trait CompletionTypes {
     }
 
     def completionStrings: Seq[String] =
-      sets.values.toSeq
+      sets.values.toStream
         .sortBy(_.score)
         .reverse
         .flatMap(_.stringEntries)
@@ -248,7 +248,7 @@ trait CompletionTypes {
   }
 
   private def encodeJson(meta: JValue) = compact(render(meta))
-  private def printJson(meta: JValue) = pretty(render(meta))
+  private def printJson(meta: JValue)  = pretty(render(meta))
 
   case object Completions {
     def apply(position: Position, meta: Option[String], completionSets: Seq[(String, CompletionSet)]): Completions =
@@ -261,7 +261,7 @@ trait CompletionTypes {
       Completions(position, meta, CompletionSet(completions))
     def apply(position: Position, completions: Traversable[Elems]): Completions =
       Completions(position, None, CompletionSet(completions))
-    def apply(position: Position, meta:Option[String], completionSets: Iterable[CompletionSet]): Completions =
+    def apply(position: Position, meta: Option[String], completionSets: Iterable[CompletionSet]): Completions =
       Completions(position, meta, completionSets.map(s => s.tag.label -> s).toSeq)
     def apply(position: Position, completionSets: Iterable[CompletionSet]): Completions =
       Completions(position, None, completionSets.map(s => s.tag.label -> s).toSeq)

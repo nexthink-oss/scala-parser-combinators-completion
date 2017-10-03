@@ -23,8 +23,8 @@ trait TermsParsingHelpers { this: RegexParsers =>
     reader.source.subSequence(start, end).toString
   private def lastPosition[T](reader: Reader[T]): Int = reader.source.length
 
-  protected def findAllMatchingTerms(in: Input, pos: Int, map: PrefixMap[String]): (Seq[(String, Int)], Int) = {
-    def findAllMatchingTermsIter(in: Input, pos: Int, map: PrefixMap[String], prevMatches: Seq[(String, Int)]): (Seq[(String, Int)], Int) = {
+  protected def findAllMatchingTerms(in: Input, pos: Int, map: PrefixMap[String]): (Stream[(String, Int)], Int) = {
+    def findAllMatchingTermsIter(in: Input, pos: Int, map: PrefixMap[String], prevMatches: Stream[(String, Int)]): (Stream[(String, Int)], Int) = {
       lazy val nextSuffixChar = charAtPosition(in, pos)
       if (handleWhiteSpace(in.source, pos) < lastPosition(in) && map.hasSuffix(nextSuffixChar)) {
         findAllMatchingTermsIter(in, pos + 1, map.withPrefix(nextSuffixChar), prevMatches ++ map.value.map((_, pos)))
@@ -32,16 +32,16 @@ trait TermsParsingHelpers { this: RegexParsers =>
         (prevMatches ++ map.value.map((_, pos)), pos)
       }
     }
-    findAllMatchingTermsIter(in, pos, map, Seq())
+    findAllMatchingTermsIter(in, pos, map, Stream())
   }
 
-  protected def findAllTermsWithPrefix(in: Input, pos: Int, map: PrefixMap[String]): Seq[String] = {
-    def findAllTermsWithPrefixIter(in: Input, pos: Int, map: PrefixMap[String]): Seq[String] = {
+  protected def findAllTermsWithPrefix(in: Input, pos: Int, map: PrefixMap[String]): Stream[String] = {
+    def findAllTermsWithPrefixIter(in: Input, pos: Int, map: PrefixMap[String]): Stream[String] = {
       lazy val nextSuffixChar = charAtPosition(in, pos)
       if (handleWhiteSpace(in.source, pos) < lastPosition(in) && map.hasSuffix(nextSuffixChar)) {
         findAllTermsWithPrefixIter(in, pos + 1, map.withPrefix(nextSuffixChar))
       } else {
-        map.toSeq.map { case (_, term) => term }
+        map.toStream.map { case (_, term) => term }
       }
     }
     findAllTermsWithPrefixIter(in, pos, map)

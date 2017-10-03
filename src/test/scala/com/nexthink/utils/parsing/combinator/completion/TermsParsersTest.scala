@@ -35,17 +35,17 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     val samples = Table(
       "skyp" -> "Skype, Skype Handsfree Support, Skype Monitor",
       "NEXT" -> "NEXThink Finder",
-      "A" -> "Activity Monitor, Adobe Acrobat"
+      "A"    -> "Activity Monitor, Adobe Acrobat"
     )
     forAll(samples) { (partial: String, options: String) =>
       val completedTerms = options.split(",").map(_.trim)
-      val completions = termsParsers$.completeString(terms, partial)
+      val completions    = termsParsers$.completeString(terms, partial)
       completions shouldBe completedTerms
     }
   }
 
   property("oneOfTerms returns correct next") {
-    val terms = termsParsers$.oneOfTerms(examples)
+    val terms  = termsParsers$.oneOfTerms(examples)
     val result = termsParsers$.parse(terms, "skype h")
     result.successful shouldBe true
     result.next.pos.column shouldBe 6
@@ -84,6 +84,34 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
               parsedLiteral === term
             case termsParsers$.NoSuccess(msg, _) => fail(msg)
           }
+        }
+      }
+    }
+  }
+
+  property("oneOfTerms with empty completes with all terms in alphabetical order") {
+    forAll(sampleTerms) { terms: List[String] =>
+      {
+        val parser      = termsParsers$.oneOfTerms(terms)
+        val completions = termsParsers$.complete(parser, " ")
+        withClue(s"terms=$terms, completions=$completions") {
+          completions.defaultSet.isDefined shouldBe true
+          terms.distinct.sorted.zipAll(completions.completionStrings, "extraCompletion", "missingCompletion").foreach {
+            case (expected, actual) => actual === expected
+          }
+        }
+      }
+    }
+  }
+
+  property("oneOfTerms with empty spaces completes at the last relevant input position") {
+    forAll(sampleTerms, Gen.chooseNum(1, 10)) { (terms: List[String], spacesCount: Int) =>
+      {
+        val spaces      = Seq.range(0, spacesCount).map(_ => " ").mkString
+        val parser      = termsParsers$.oneOfTerms(terms)
+        val completions = termsParsers$.complete(parser, spaces)
+        withClue(s"terms=$terms, completions=$completions") {
+          completions.position.column shouldBe 1
         }
       }
     }
