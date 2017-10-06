@@ -1,2 +1,11 @@
-*.class
-*.log
+target
+/.idea
+/.idea_modules
+/.classpath
+/.project
+/.settings
+.history
+.vscode/
+node_modules
+local.conf
+*.sc
