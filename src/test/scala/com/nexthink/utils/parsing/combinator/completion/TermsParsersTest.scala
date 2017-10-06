@@ -32,7 +32,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     List("7-Zip", "Skype", "Skype Monitor", "Skype Handsfree Support", "Activity Monitor", "Adobe Acrobat", "Google Chrome", "GoToMeeting", "NEXThink Finder")
 
   property("oneOfTerms completions with concrete examples") {
-    val terms = termsParsers$.oneOfTerms(examples)
+    val terms = oneOfTerms(examples)
     val samples = Table(
       "skyp" -> "Skype, Skype Handsfree Support, Skype Monitor",
       "NEXT" -> "NEXThink Finder",
@@ -40,20 +40,20 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     )
     forAll(samples) { (partial: String, options: String) =>
       val completedTerms = options.split(",").map(_.trim)
-      val completions    = termsParsers$.completeString(terms, partial)
+      val completions    = completeString(terms, partial)
       completions shouldBe completedTerms
     }
   }
 
   property("oneOfTerms returns correct next") {
-    val terms  = termsParsers$.oneOfTerms(examples)
-    val result = termsParsers$.parse(terms, "skype h")
+    val terms  = oneOfTerms(examples)
+    val result = parse(terms, "skype h")
     result.successful shouldBe true
     result.next.pos.column shouldBe 8
   }
 
   property("oneOfTermsFuzzy completions with concrete examples") {
-    val terms = termsParsers$.oneOfTermsFuzzy(examples)
+    val terms = oneOfTermsFuzzy(examples)
     val samples = Table(
       "chrom" -> "Google Chrome",
       "finde" -> "NEXThink Finder",
@@ -62,7 +62,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
       "skyp"  -> "Skype Handsfree Support"
     )
     forAll(samples) { (partial: String, term: String) =>
-      val completions = termsParsers$.completeString(terms, partial)
+      val completions = completeString(terms, partial)
       completions should contain(term)
     }
   }

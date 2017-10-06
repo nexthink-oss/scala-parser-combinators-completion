@@ -68,7 +68,8 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       if (terms.isEmpty) {
         failure("empty terms")
       } else {
-        val trie = Trie(normalizedTerms(terms).zip(trimmedNonEmptyTerms(terms)).map {
+        val original = trimmedNonEmptyTerms(terms)
+        val trie = Trie(normalizedTerms(original).zip(original).map {
           case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
         }: _*)
         new TermsParser(trie, maxCompletionsCount)
@@ -127,7 +128,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
         failure("empty terms")
       } else {
         val originals                 = trimmedNonEmptyTerms(terms)
-        val normalized                = normalizedTerms(terms)
+        val normalized                = normalizedTerms(originals)
         val completionsWhenInputEmpty = alphabeticalCompletions(originals, maxCompletionsCount)
         val trigramTermPairs =
           normalized.zip(originals).par.flatMap {
