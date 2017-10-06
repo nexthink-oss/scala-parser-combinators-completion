@@ -1,4 +1,4 @@
-addSbtPlugin("org.foundweekends" % "sbt-bintray" % "0.5.1")
+//addSbtPlugin("org.foundweekends" % "sbt-bintray" % "0.5.1")
 
 resolvers ++= Seq(
   "Local Maven Repository" at s"${Path.userHome.asFile.toURI.toURL}/.m2/repository",
