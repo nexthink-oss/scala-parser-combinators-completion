@@ -27,7 +27,7 @@ class Trie private {
 
   def allValues: Stream[String] = {
     val subValues = values.toStream.flatMap(_.allValues)
-    if (value != null){
+    if (value != null) {
       value #:: subValues
     } else {
       subValues

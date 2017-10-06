@@ -64,11 +64,15 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
   }
 
   private object TermsParser {
-    def apply(terms: Seq[String], maxCompletionsCount: Int): TermsParser = {
-      val trie = Trie(normalizedTerms(terms).zip(trimmedNonEmptyTerms(terms)).map {
-        case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
-      }: _*)
-      new TermsParser(trie, maxCompletionsCount)
+    def apply(terms: Seq[String], maxCompletionsCount: Int): Parser[String] = {
+      if (terms.isEmpty) {
+        failure("empty terms")
+      } else {
+        val trie = Trie(normalizedTerms(terms).zip(trimmedNonEmptyTerms(terms)).map {
+          case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
+        }: _*)
+        new TermsParser(trie, maxCompletionsCount)
+      }
     }
   }
 
@@ -91,9 +95,9 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       if (tryParse(in)._1.nonEmpty)
         Completions.empty
       else {
-        val start = dropAnyWhiteSpace(in)
+        val start         = dropAnyWhiteSpace(in)
         val possibleTerms = alphabeticalCompletions(findAllTermsWithPrefix(start, start.offset, trie), maxCompletionsCount)
-        Completions(in.pos, possibleTerms)
+        Completions(start.pos, possibleTerms)
       }
     }
 
@@ -118,20 +122,24 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
         .toSet)
 
   private object FuzzyParser {
-    def apply(terms: Seq[String], similarityMeasure: (String, String) => Double, similarityThreshold: Int, maxCompletionsCount: Int): FuzzyParser = {
-      val originals                 = trimmedNonEmptyTerms(terms)
-      val normalized                = normalizedTerms(terms)
-      val completionsWhenInputEmpty = alphabeticalCompletions(originals, maxCompletionsCount)
-      val trigramTermPairs =
-        normalized.zip(originals).par.flatMap {
-          case (normalizedTerm, originalTerm) =>
-            tokenizeWords(normalizedTerm).flatMap(trigramsWithAffixing).map(trigram => trigram -> originalTerm)
-        }
-      val ngramMap = PrefixMap(trigramTermPairs.groupBy(_._1).mapValues(_.map(_._2).toArray).toSeq.seq: _*)
-      val trie = Trie(normalized.zip(originals).map {
-        case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
-      }: _*)
-      new FuzzyParser(completionsWhenInputEmpty, ngramMap, trie, similarityMeasure, similarityThreshold, maxCompletionsCount)
+    def apply(terms: Seq[String], similarityMeasure: (String, String) => Double, similarityThreshold: Int, maxCompletionsCount: Int): Parser[String] = {
+      if (terms.isEmpty) {
+        failure("empty terms")
+      } else {
+        val originals                 = trimmedNonEmptyTerms(terms)
+        val normalized                = normalizedTerms(terms)
+        val completionsWhenInputEmpty = alphabeticalCompletions(originals, maxCompletionsCount)
+        val trigramTermPairs =
+          normalized.zip(originals).par.flatMap {
+            case (normalizedTerm, originalTerm) =>
+              tokenizeWords(normalizedTerm).flatMap(trigramsWithAffixing).map(trigram => trigram -> originalTerm)
+          }
+        val ngramMap = PrefixMap(trigramTermPairs.groupBy(_._1).mapValues(_.map(_._2).toArray).toSeq.seq: _*)
+        val trie = Trie(normalized.zip(originals).map {
+          case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
+        }: _*)
+        new FuzzyParser(completionsWhenInputEmpty, ngramMap, trie, similarityMeasure, similarityThreshold, maxCompletionsCount)
+      }
     }
   }
 
@@ -149,7 +157,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       else {
         val start = dropAnyWhiteSpace(in)
         if (start.atEnd) {
-          Completions(in.pos, completionsWhenInputEmpty)
+          Completions(start.pos, completionsWhenInputEmpty)
         } else {
           fuzzyCompletions(start)
         }
@@ -176,8 +184,8 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       iter(ngrams.head, ngrams.tail, Set(), Map())
     }
 
-    private def fuzzyCompletions(in: Input): Completions = {
-      val incompleteTerm = remainder(in)
+    private def fuzzyCompletions(start: Input): Completions = {
+      val incompleteTerm = remainder(start)
       val candidates     = findCandidateMatches(incompleteTerm)
       val rankedCompletions = lazyQuicksort(
         candidates.toStream
@@ -190,7 +198,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       }))
         .take(maxCompletionsCount)
       if (rankedCompletions.nonEmpty) {
-        Completions(in.pos, CompletionSet(rankedCompletions.map {
+        Completions(start.pos, CompletionSet(rankedCompletions.map {
           case (term: String, score: Int) => Completion(term, score)
         }))
       } else {
