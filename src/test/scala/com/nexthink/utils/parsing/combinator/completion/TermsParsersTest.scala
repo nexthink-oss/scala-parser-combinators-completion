@@ -7,21 +7,21 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
-import com.nexthink.utils.parsing.combinator.completion.TermsParsersTest.termsParsers$
 import org.junit.runner.RunWith
 import org.scalacheck.Gen
+import org.scalatest.Inside
+import org.scalatest.Matchers
+import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Inside, Matchers, PropSpec}
 
 // scalastyle:off magic.number
-object TermsParsersTest {
-  object termsParsers$ extends TermsParsers
-}
 
 @RunWith(classOf[JUnitRunner])
 class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with Inside {
-  import termsParsers$._
+  import TermsParsers._
+  private val maxCompletions = 15
+
   private val nonEmptyTerm                   = Gen.alphaNumStr.suchThat(t => t.nonEmpty && t.forall(_ >= ' '))
   private val nonEmptyTermLargerThanTwoChars = nonEmptyTerm.suchThat(t => t.length > 2)
   private val sampleTerms                    = Gen.containerOfN[List, String](10, nonEmptyTerm).suchThat(list => list.nonEmpty)
@@ -32,7 +32,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     List("7-Zip", "Skype", "Skype Monitor", "Skype Handsfree Support", "Activity Monitor", "Adobe Acrobat", "Google Chrome", "GoToMeeting", "NEXThink Finder")
 
   property("oneOfTerms completions with concrete examples") {
-    val terms = oneOfTerms(examples)
+    val terms = oneOfTerms(examples, maxCompletions)
     val samples = Table(
       "skyp" -> "Skype, Skype Handsfree Support, Skype Monitor",
       "NEXT" -> "NEXThink Finder",
@@ -46,14 +46,14 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
   }
 
   property("oneOfTerms returns correct next") {
-    val terms  = oneOfTerms(examples)
+    val terms  = oneOfTerms(examples, maxCompletions)
     val result = parse(terms, "skype h")
     result.successful shouldBe true
     result.next.pos.column shouldBe 8
   }
 
   property("oneOfTermsFuzzy completions with concrete examples") {
-    val terms = oneOfTermsFuzzy(examples)
+    val terms = oneOfTermsFuzzy(examples, maxCompletions)
     val samples = Table(
       "chrom" -> "Google Chrome",
       "finde" -> "NEXThink Finder",
@@ -67,7 +67,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     }
   }
 
-  val termsParsers = Gen.oneOf((terms: Seq[String]) => oneOfTerms(terms), (terms: Seq[String]) => oneOfTermsFuzzy(terms))
+  val termsParsers = Gen.oneOf((terms: Seq[String]) => oneOfTerms(terms, maxCompletions), (terms: Seq[String]) => oneOfTermsFuzzy(terms, maxCompletions))
 
   property("oneOfTerms completes to nothing if term is complete even followed with whitespace") {
     forAll(nonEmptyTermLargerThanTwoChars, variableLengthWhitespace, termsParsers) { (term: String, whitespace: String, parserCreator: (Seq[String]) => Parser[String]) =>
@@ -128,7 +128,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
   property("parser with empty spaces completes at the last input position") {
     forAll(sampleTerms, Gen.chooseNum(1, 10), termsParsers) { (terms: List[String], spacesCount: Int, parserCreator: (Seq[String]) => Parser[String]) =>
       {
-        val spaces = Seq.range(0, spacesCount).map(_ => " ").mkString
+        val spaces      = Seq.range(0, spacesCount).map(_ => " ").mkString
         val parser      = parserCreator(terms)
         val completions = complete(parser, spaces)
         withClue(s"terms=$terms, completions=$completions") {
@@ -141,7 +141,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
   property("oneOfTermsFuzzy with same similarity completes in alphabetical order") {
     forAll(sampleTerms) { terms: List[String] =>
       {
-        val parser = oneOfTermsFuzzy(terms, similarityMeasure = (_, _) => 100)
+        val parser = oneOfTermsFuzzy(terms, maxCompletions, similarityMeasure = (_, _) => 100)
         terms.foreach(term => {
           val completions = complete(parser, term.take(1))
           withClue(s"terms=$terms, completions=$completions") {
@@ -159,7 +159,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
   property("oneOfTermsFuzzy completions with prefix or suffix always includes full term (thanks to affixing)") {
     forAll(sampleTermsLargerThanTwoChars) { terms: List[String] =>
       {
-        val parser = oneOfTermsFuzzy(terms, similarityThreshold = 0)
+        val parser = oneOfTermsFuzzy(terms, maxCompletions, similarityThreshold = 0)
         terms.foreach(term => {
           forAll(Gen.choose(1, term.length - 1), Gen.oneOf(true, false)) { (substringLength, isPrefix) =>
             val substring =
@@ -188,7 +188,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
   property("oneOfTermsFuzzy with similarity threshold limits completions count to that number") {
     forAll(sampleTermsLargerThanTwoChars, Gen.choose(0, 100)) { (terms: List[String], threshold: Int) =>
       {
-        val parser = oneOfTermsFuzzy(terms, similarityThreshold = threshold)
+        val parser = oneOfTermsFuzzy(terms, maxCompletions, similarityThreshold = threshold)
         terms.foreach(term => {
           val substring   = term.drop(1)
           val completions = complete(parser, substring)
