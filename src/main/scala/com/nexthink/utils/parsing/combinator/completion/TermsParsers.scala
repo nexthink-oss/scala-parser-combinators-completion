@@ -72,39 +72,45 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
         val trie = Trie(normalizedTerms(original).zip(original).map {
           case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
         }: _*)
-        new TermsParser(trie, maxCompletionsCount)
+        new TermsParser(trie, maxCompletionsCount, completionsWhenInputEmpty = alphabeticalCompletions(terms, maxCompletionsCount))
       }
     }
   }
 
-  sealed private class TermsParser(trie: Trie, maxCompletionsCount: Int) extends Parser[String] {
+  sealed private class TermsParser(trie: Trie, maxCompletionsCount: Int, completionsWhenInputEmpty: CompletionSet) extends Parser[String] {
     override def apply(in: Input): ParseResult[String] = {
-      val (terms, finalPosition) = tryParse(in)
-      val next                   = in.drop(finalPosition - in.offset)
-      terms.lastOption match {
-        case Some(term) => Success(term, next)
-        case None =>
-          if (finalPosition == in.source.length) {
-            Failure("expected term but end of source reached", next)
+        tryParse(in) match {
+        case Right(MatchingTerms(terms, _)) => Success(terms.last.term, in.drop(terms.last.column - in.pos.column))
+        case Left(finalColumn) =>
+          val start = handleWhiteSpace(in)
+          if (finalColumn == in.source.length) {
+            Failure("expected term but end of source reached", in.drop(start - in.offset))
           } else {
-            Failure(s"no term found starting with ${subSequence(dropAnyWhiteSpace(in), finalPosition)}", next)
+            Failure(s"no term found starting with ${in.source.subSequence(start, finalColumn).toString()}",  in.drop(start - in.offset))
           }
       }
     }
 
     override def completions(in: Input): Completions = {
-      if (tryParse(in)._1.nonEmpty)
+      if (tryParse(in).isRight)
         Completions.empty
       else {
-        val start         = dropAnyWhiteSpace(in)
-        val possibleTerms = alphabeticalCompletions(findAllTermsWithPrefix(start, start.offset, trie), maxCompletionsCount)
-        Completions(start.pos, possibleTerms)
+        val start = dropAnyWhiteSpace(in)
+        if (start.atEnd) {
+          Completions(start.pos, completionsWhenInputEmpty)
+        } else {
+          val possibleTerms = alphabeticalCompletions(findAllTermsWithPrefix(start, start.offset, trie), maxCompletionsCount)
+          Completions(start.pos, possibleTerms)
+        }
       }
     }
 
-    protected def tryParse(in: Input): (Seq[String], Int) = {
+    protected def tryParse(in: Input): Either[Int, MatchingTerms] = {
       val start = dropAnyWhiteSpace(in)
-      findAllMatchingTerms(start, start.offset, trie)
+      findAllMatchingTerms(start, start.offset, trie) match {
+        case MatchingTerms(Seq(), finalColumn) => Left(finalColumn)
+        case success => Right(success)
+      }
     }
   }
 
@@ -139,21 +145,21 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
         val trie = Trie(normalized.zip(originals).map {
           case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
         }: _*)
-        new FuzzyParser(completionsWhenInputEmpty, ngramMap, trie, similarityMeasure, similarityThreshold, maxCompletionsCount)
+        new FuzzyParser(ngramMap, trie, completionsWhenInputEmpty, similarityMeasure, similarityThreshold, maxCompletionsCount)
       }
     }
   }
 
-  sealed private class FuzzyParser private (completionsWhenInputEmpty: CompletionSet,
-                                            ngramMap: PrefixMap[Array[String]],
+  sealed private class FuzzyParser private (ngramMap: PrefixMap[Array[String]],
                                             trie: Trie,
+                                            completionsWhenInputEmpty: CompletionSet,
                                             similarityMeasure: (String, String) => Double,
                                             similarityThreshold: Int,
                                             maxCompletionsCount: Int)
-      extends TermsParser(trie, maxCompletionsCount) {
+      extends TermsParser(trie, maxCompletionsCount, completionsWhenInputEmpty) {
 
     override def completions(in: Input): Completions = {
-      if (tryParse(in)._1.nonEmpty)
+      if (tryParse(in).isRight)
         Completions.empty
       else {
         val start = dropAnyWhiteSpace(in)

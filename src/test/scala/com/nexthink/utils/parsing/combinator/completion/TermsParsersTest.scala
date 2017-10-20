@@ -28,29 +28,51 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
   private val variableLengthWhitespace       = Gen.choose(1, 10).map(i => List.fill(i)(" ").mkString)
   private val sampleTermsLargerThanTwoChars =
     Gen.containerOfN[List, String](10, nonEmptyTermLargerThanTwoChars).suchThat(list => list.nonEmpty)
+  private val sampleUniqueTermsLargerThanTwoChars =  Gen.containerOfN[Set, String](10, nonEmptyTermLargerThanTwoChars).suchThat(list => list.nonEmpty)
   private val examples =
     List("7-Zip", "Skype", "Skype Monitor", "Skype Handsfree Support", "Activity Monitor", "Adobe Acrobat", "Google Chrome", "GoToMeeting", "NEXThink Finder")
+
+  property("oneOfTerms with partial input fails") {
+    val terms  = oneOfTerms(examples)
+    val result = parse(terms, "skyp")
+    result.successful shouldBe false
+    remainder(result.next) shouldBe "skyp"
+    result.next.pos.column shouldBe 1
+  }
+
+  property("oneOfTerms returns correct next with partial success") {
+    val terms  = oneOfTerms(examples)
+    val result = parse(terms, "skype hands")
+    result.successful shouldBe true
+    remainder(result.next) shouldBe " hands"
+    result.next.pos.column shouldBe 6
+  }
+
+  property("oneOfTerms returns correct next with success") {
+    val terms  = oneOfTerms(examples)
+    val result = parse(terms, "skype foobar")
+    result.successful shouldBe true
+    remainder(result.next) shouldBe " foobar"
+    result.next.pos.column shouldBe 6
+  }
 
   property("oneOfTerms completions with concrete examples") {
     val terms = oneOfTerms(examples)
     val samples = Table(
+      heading = ("input", "result"),
       "skyp" -> "Skype, Skype Handsfree Support, Skype Monitor",
+      "sa" -> "",
       "NEXT" -> "NEXThink Finder",
       "A"    -> "Activity Monitor, Adobe Acrobat"
     )
     forAll(samples) { (partial: String, options: String) =>
-      val completedTerms = options.split(",").map(_.trim)
+      val completedTerms: Seq[String] = if (options.isEmpty) Nil else options.split(",").map(_.trim)
       val completions    = completeString(terms, partial)
       completions shouldBe completedTerms
     }
   }
 
-  property("oneOfTerms returns correct next") {
-    val terms  = oneOfTerms(examples)
-    val result = parse(terms, "skype h")
-    result.successful shouldBe true
-    result.next.pos.column shouldBe 8
-  }
+
 
   property("oneOfTermsFuzzy completions with concrete examples") {
     val terms = oneOfTermsFuzzy(examples)
@@ -79,7 +101,17 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     }
   }
 
-  property("oneOfTerms does parse all terms (symmetry)") {
+  property("oneOfTerms completes to nothing if input doesn't match any term"){
+    forAll(sampleUniqueTermsLargerThanTwoChars) { (terms: Set[String] ) =>
+      val excludedTerm = terms.head
+      val includedTerms = terms.tail.toSeq
+      val parser = oneOfTerms(includedTerms)
+      val completions = completeString(parser, excludedTerm)
+      completions shouldBe empty
+    }
+  }
+
+  property("oneOfTerms parses all terms (symmetry)") {
     forAll(sampleTerms, termsParsers) { (terms: List[String], parserCreator: (Seq[String]) => Parser[String]) =>
       {
         val parser = parserCreator(terms)

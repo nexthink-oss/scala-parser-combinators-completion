@@ -18,42 +18,47 @@ trait TermsParsingHelpers { this: RegexParsers =>
     reader.source.subSequence(reader.pos.column - 1, reader.source.length).toString
   def subSequence[T](reader: Reader[T], end: Int): String = reader.source.subSequence(reader.offset, end).toString
 
-  private def charAtPosition[T](reader: Reader[T], pos: Int): Char = reader.source.charAt(pos).toLower
-  private def subSequence[T](reader: Reader[T], start: Int, end: Int): String =
-    reader.source.subSequence(start, end).toString
-  private def lastPosition[T](reader: Reader[T]): Int = reader.source.length
+  private def charAtPosition[T](reader: Reader[T], pos: Int): Char            = reader.source.charAt(pos).toLower
+  private def subSequence[T](reader: Reader[T], start: Int, end: Int): String = reader.source.subSequence(start, end).toString
 
-  protected def findAllMatchingTerms(in: Input, pos: Int, map: Trie): (Seq[String], Int) = {
-    def addToSeq(ss: Seq[String], value: String) =
+  case class MatchingTerm(term: String, column: Int)
+  case class MatchingTerms(terms: Seq[MatchingTerm], finalColumn: Int)
+
+  protected def findAllMatchingTerms(in: Input, offset: Int, map: Trie): MatchingTerms = {
+    def addToSeq(ss: Seq[MatchingTerm], value: String, offset: Int) =
       if (value != null) { // scalastyle:ignore null
-        ss :+ value
+        ss :+ MatchingTerm(value, offset+1)
       } else {
         ss
       }
-    def findAllMatchingTermsIter(in: Input, pos: Int, map: Trie, prevMatches: Seq[String]): (Seq[String], Int) = {
-      lazy val nextSuffixChar = charAtPosition(in, pos)
-      if (handleWhiteSpace(in.source, pos) < lastPosition(in)) {
-        map.getMapForSuffix(nextSuffixChar) match {
-          case Some(subMap) => findAllMatchingTermsIter(in, pos + 1, subMap, addToSeq(prevMatches, map.value))
-          case None         => (addToSeq(prevMatches, map.value), pos)
-        }
+    def findAllMatchingTermsIter(in: Input, offset: Int, map: Trie, prevMatches: Seq[MatchingTerm]): MatchingTerms = {
+      if (offset >= in.source.length) {
+        MatchingTerms(addToSeq(prevMatches, map.value, offset), offset)
       } else {
-        (addToSeq(prevMatches, map.value), pos)
+        map.getMapForSuffix(charAtPosition(in, offset)) match {
+          case Some(subMap) =>
+            findAllMatchingTermsIter(in, offset + 1, subMap, addToSeq(prevMatches, map.value, offset))
+          case None => MatchingTerms(addToSeq(prevMatches, map.value, offset), offset+1)
+        }
       }
     }
-    findAllMatchingTermsIter(in, pos, map, Seq())
+    findAllMatchingTermsIter(in, offset, map, Seq())
   }
 
-  protected def findAllTermsWithPrefix(in: Input, pos: Int, map: Trie): Stream[String] = {
-    def findAllTermsWithPrefixIter(in: Input, pos: Int, map: Trie): Stream[String] = {
-      lazy val nextSuffixChar = charAtPosition(in, pos)
-      lazy val subMap = map.getMapForSuffix(nextSuffixChar)
-      if (handleWhiteSpace(in.source, pos) < lastPosition(in) && subMap.isDefined) {
-        findAllTermsWithPrefixIter(in, pos + 1, subMap.get)
-      } else {
+  protected def findAllTermsWithPrefix(in: Input, offset: Int, map: Trie): Stream[String] = {
+    def findAllTermsWithPrefixIter(in: Input, offset: Int, map: Trie): Stream[String] = {
+      if (offset >= in.source.length) {
         map.allValues
+      } else {
+        val currentChar = charAtPosition(in, offset)
+        map
+          .getMapForSuffix(currentChar)
+          .map(
+            findAllTermsWithPrefixIter(in, offset + 1, _)
+          )
+          .getOrElse(Stream())
       }
     }
-    findAllTermsWithPrefixIter(in, pos, map)
+    findAllTermsWithPrefixIter(in, offset, map)
   }
 }

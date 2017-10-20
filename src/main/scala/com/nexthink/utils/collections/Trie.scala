@@ -15,9 +15,10 @@ class Trie private {
   var value: String               = _
 
   def getMapForSuffix(c: Char): Option[Trie] = {
+    val lowerC = c.toLower
     var i = 0
     while (i < keys.length) {
-      if (keys(i) == c) {
+      if (keys(i) == lowerC) {
         return Some(values(i))
       }
       i = i + 1
@@ -38,7 +39,7 @@ class Trie private {
     if (s.isEmpty) {
       this
     } else {
-      val leading = s(0)
+      val leading = s(0).toLower
       val suffix = getMapForSuffix(leading) match {
         case None => {
           val newKeys   = util.Arrays.copyOf(keys, keys.length + 1)
