@@ -7,10 +7,15 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
-import com.nexthink.utils.collections.{Trie, PrefixMap}
-import com.nexthink.utils.parsing.distance.DiceSorensenDistance.diceSorensenSimilarity
-import com.nexthink.utils.parsing.distance._
+import java.util
+
 import com.nexthink.utils.collections.lazyQuicksort
+import com.nexthink.utils.collections.PrefixMap
+import com.nexthink.utils.collections.Trie
+import com.nexthink.utils.parsing.distance.DiceSorensenDistance.diceSorensenSimilarity
+import com.nexthink.utils.parsing.distance.trigramsWithAffixing
+import com.nexthink.utils.parsing.distance.tokenizeWords
+
 import scala.util.parsing.combinator.RegexParsers
 
 /**
@@ -18,7 +23,6 @@ import scala.util.parsing.combinator.RegexParsers
   * completion (supporting fuzzy matching)
   */
 trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsParsingHelpers {
-  val DefaultMaxCompletionsCount                  = 15 // exposed
   private val DefaultSimilarityThreshold          = 20
   private val CompletionCandidatesMultiplierRatio = 3
 
@@ -30,7 +34,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
     * @param maxCompletionsCount maximum number of completions returned by the parser
     * @return parser instance
     */
-  def oneOfTerms(terms: Seq[String], maxCompletionsCount: Int = DefaultMaxCompletionsCount): Parser[String] = {
+  def oneOfTerms(terms: Seq[String], maxCompletionsCount: Int): Parser[String] = {
     TermsParser(terms, maxCompletionsCount)
   }
 
@@ -57,9 +61,9 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
     * @return parser instance
     */
   def oneOfTermsFuzzy(terms: Seq[String],
+                      maxCompletionsCount: Int,
                       similarityMeasure: (String, String) => Double = diceSorensenSimilarity,
-                      similarityThreshold: Int = DefaultSimilarityThreshold,
-                      maxCompletionsCount: Int = DefaultMaxCompletionsCount): Parser[String] = {
+                      similarityThreshold: Int = DefaultSimilarityThreshold): Parser[String] = {
     FuzzyParser(terms, similarityMeasure, similarityThreshold, maxCompletionsCount)
   }
 
@@ -117,16 +121,68 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
   private def trimmedNonEmptyTerms(terms: Seq[String]) = terms.map(_.trim()).filter(_.nonEmpty)
   private def normalizedTerms(terms: Seq[String])      = terms.map(_.toLowerCase)
 
-  private def alphabeticalCompletions(terms: Iterable[String], maxCompletionsCount: Int): CompletionSet =
-    CompletionSet(
-      lazyQuicksort(terms.toStream)
-        .take(maxCompletionsCount)
-        .reverse
-        .zipWithIndex
+  def alphabeticalCompletions(terms: Iterable[String], maxCompletionsCount: Int): CompletionSet = {
+    if (maxCompletionsCount == 0) {
+      CompletionSet(Seq[Completion]())
+    } else {
+      val arr         = Array.ofDim[String](maxCompletionsCount)
+      var currentSize = 0
+
+      for (t <- terms) {
+        currentSize = addToSet(arr, currentSize, maxCompletionsCount, t)
+      }
+
+      val sortedStrings: Array[String] = util.Arrays.copyOf(arr, currentSize).sorted
+
+      val completions = sortedStrings.zipWithIndex
         .map {
-          case (t, rank) => Completion(t, rank)
+          case (t, rank) => Completion(t, maxCompletionsCount - rank)
         }
-        .toSet)
+
+      CompletionSet(completions)
+    }
+  }
+
+  /**
+    * efficiently add a string to fixed length array, as long the string doesn't already exist, and it isn't
+    * lexicographically greater than the greatest existing entry
+    * @return number of items in array
+    */
+  // scalastyle:off return
+  private def addToSet(arr: Array[String], currentSize: Int, maxSize: Int, s: String): Int = {
+    var i = 0
+    while (i < currentSize) {
+      if (arr(i) == s) {
+        return currentSize
+      }
+
+      i = i + 1
+    }
+
+    if (currentSize < maxSize) {
+      arr(currentSize) = s
+      return currentSize + 1
+    }
+
+    // find largest existing entry
+    var largest = 0
+    var j       = 1
+    while (j < maxSize) {
+      if (arr(largest) < arr(j)) {
+        largest = j
+      }
+
+      j = j + 1
+    }
+
+    // if s < largest existing, replace it in array
+    if (s < arr(largest)) {
+      arr(largest) = s
+    }
+
+    currentSize
+  }
+  // scalastyle:on return
 
   private object FuzzyParser {
     def apply(terms: Seq[String], similarityMeasure: (String, String) => Double, similarityThreshold: Int, maxCompletionsCount: Int): Parser[String] = {
@@ -221,3 +277,5 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
   }
 
 }
+
+object TermsParsers extends TermsParsers
