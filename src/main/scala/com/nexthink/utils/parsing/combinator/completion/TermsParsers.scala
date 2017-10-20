@@ -72,25 +72,27 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       if (terms.isEmpty) {
         failure("empty terms")
       } else {
-        val original = trimmedNonEmptyTerms(terms)
-        val trie = Trie(normalizedTerms(original).zip(original).map {
+        val originals                 = trimmedNonEmptyTerms(terms)
+        val normalized                = normalizedTerms(originals)
+        val completionsWhenInputEmpty = alphabeticalCompletions(originals, maxCompletionsCount)
+        val trie = Trie(normalized.zip(originals).map {
           case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
         }: _*)
-        new TermsParser(trie, maxCompletionsCount, completionsWhenInputEmpty = alphabeticalCompletions(terms, maxCompletionsCount))
+        new TermsParser(trie, maxCompletionsCount, completionsWhenInputEmpty)
       }
     }
   }
 
   sealed private class TermsParser(trie: Trie, maxCompletionsCount: Int, completionsWhenInputEmpty: CompletionSet) extends Parser[String] {
     override def apply(in: Input): ParseResult[String] = {
-        tryParse(in) match {
+      tryParse(in) match {
         case Right(MatchingTerms(terms, _)) => Success(terms.last.term, in.drop(terms.last.column - in.pos.column))
         case Left(finalColumn) =>
           val start = handleWhiteSpace(in)
           if (finalColumn == in.source.length) {
             Failure("expected term but end of source reached", in.drop(start - in.offset))
           } else {
-            Failure(s"no term found starting with ${in.source.subSequence(start, finalColumn).toString()}",  in.drop(start - in.offset))
+            Failure(s"no term found starting with ${in.source.subSequence(start, finalColumn).toString()}", in.drop(start - in.offset))
           }
       }
     }
@@ -103,8 +105,8 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
         if (start.atEnd) {
           Completions(start.pos, completionsWhenInputEmpty)
         } else {
-          val possibleTerms = alphabeticalCompletions(findAllTermsWithPrefix(start, start.offset, trie), maxCompletionsCount)
-          Completions(start.pos, possibleTerms)
+          val possibleTerms = findAllTermsWithPrefix(start, start.offset, trie)
+          if (possibleTerms.isEmpty) Completions.empty else Completions(start.pos, alphabeticalCompletions(possibleTerms, maxCompletionsCount))
         }
       }
     }
@@ -113,7 +115,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       val start = dropAnyWhiteSpace(in)
       findAllMatchingTerms(start, start.offset, trie) match {
         case MatchingTerms(Seq(), finalColumn) => Left(finalColumn)
-        case success => Right(success)
+        case success                           => Right(success)
       }
     }
   }

@@ -31,7 +31,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     Gen.containerOfN[List, String](10, nonEmptyTermLargerThanTwoChars).suchThat(list => list.nonEmpty)
   private val sampleUniqueTermsLargerThanTwoChars =  Gen.containerOfN[Set, String](10, nonEmptyTermLargerThanTwoChars).suchThat(list => list.nonEmpty)
   private val examples =
-    List("7-Zip", "Skype", "Skype Monitor", "Skype Handsfree Support", "Activity Monitor", "Adobe Acrobat", "Google Chrome", "GoToMeeting", "NEXThink Finder")
+    List("", "7-Zip", "Skype", "Skype Monitor", "Skype Handsfree Support", "Activity Monitor", "Adobe Acrobat", "Google Chrome", "GoToMeeting", "NEXThink Finder")
 
   property("oneOfTerms with partial input fails") {
     val terms  = oneOfTerms(examples, maxCompletions)
@@ -73,7 +73,11 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
     }
   }
 
-
+  property("oneOfTerms completions with no terms returns empty") {
+    val terms = oneOfTerms(examples, maxCompletions)
+    val completions = complete(terms, "sa")
+    completions shouldBe Completions.empty
+  }
 
   property("oneOfTermsFuzzy completions with concrete examples") {
     val terms = oneOfTermsFuzzy(examples, maxCompletions)
