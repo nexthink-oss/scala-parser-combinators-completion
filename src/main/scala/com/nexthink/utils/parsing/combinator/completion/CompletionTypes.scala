@@ -11,7 +11,7 @@ import org.json4s
 import org.json4s.{JArray, JValue}
 
 import scala.util.parsing.input.{NoPosition, Position}
-import com.nexthink.utils.collections.lazyQuicksort
+import com.nexthink.utils.collections.SortingHelpers.lazyQuicksort
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 

@@ -1,6 +1,6 @@
-package com.nexthink.utils
+package com.nexthink.utils.collections
 
-package object collections {
+object SortingHelpers {
   def lazyQuicksort[A](xs: Stream[A])(implicit o: Ordering[A]): Stream[A] = {
     import o._
     if (xs.isEmpty) xs

@@ -7,14 +7,12 @@
 
 package com.nexthink.utils.parsing.combinator.completion
 
-import java.util
-
-import com.nexthink.utils.collections.lazyQuicksort
 import com.nexthink.utils.collections.PrefixMap
 import com.nexthink.utils.collections.Trie
 import com.nexthink.utils.parsing.distance.DiceSorensenDistance.diceSorensenSimilarity
 import com.nexthink.utils.parsing.distance.trigramsWithAffixing
 import com.nexthink.utils.parsing.distance.tokenizeWords
+import com.nexthink.utils.collections.SortingHelpers.lazyQuicksort
 
 import scala.util.parsing.combinator.RegexParsers
 
@@ -22,7 +20,7 @@ import scala.util.parsing.combinator.RegexParsers
   * This trait adds specialized parsers for dealing with large lists of terms, both in terms of parsing (using a fast trie-based lookup) and
   * completion (supporting fuzzy matching)
   */
-trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsParsingHelpers {
+trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsParsingHelpers with AlphabeticalSortingSupport {
   private val DefaultSimilarityThreshold          = 20
   private val CompletionCandidatesMultiplierRatio = 3
 
@@ -74,7 +72,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       } else {
         val originals                 = trimmedNonEmptyTerms(terms)
         val normalized                = normalizedTerms(originals)
-        val completionsWhenInputEmpty = alphabeticalCompletions(originals, maxCompletionsCount)
+        val completionsWhenInputEmpty = alphabeticallySortedCompletions(originals, maxCompletionsCount)
         val trie = Trie(normalized.zip(originals).map {
           case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
         }: _*)
@@ -92,7 +90,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
           if (finalColumn == in.source.length) {
             Failure("expected term but end of source reached", in.drop(start - in.offset))
           } else {
-            Failure(s"no term found starting with ${in.source.subSequence(start, finalColumn).toString()}", in.drop(start - in.offset))
+            Failure(s"no term found starting with ${in.source.subSequence(start, finalColumn).toString}", in.drop(start - in.offset))
           }
       }
     }
@@ -106,7 +104,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
           Completions(start.pos, completionsWhenInputEmpty)
         } else {
           val possibleTerms = findAllTermsWithPrefix(start, start.offset, trie)
-          if (possibleTerms.isEmpty) Completions.empty else Completions(start.pos, alphabeticalCompletions(possibleTerms, maxCompletionsCount))
+          if (possibleTerms.isEmpty) Completions.empty else Completions(start.pos, alphabeticallySortedCompletions(possibleTerms, maxCompletionsCount))
         }
       }
     }
@@ -123,69 +121,6 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
   private def trimmedNonEmptyTerms(terms: Seq[String]) = terms.map(_.trim()).filter(_.nonEmpty)
   private def normalizedTerms(terms: Seq[String])      = terms.map(_.toLowerCase)
 
-  def alphabeticalCompletions(terms: Iterable[String], maxCompletionsCount: Int): CompletionSet = {
-    if (maxCompletionsCount == 0) {
-      CompletionSet(Seq[Completion]())
-    } else {
-      val arr         = Array.ofDim[String](maxCompletionsCount)
-      var currentSize = 0
-
-      for (t <- terms) {
-        currentSize = addToSet(arr, currentSize, maxCompletionsCount, t)
-      }
-
-      val sortedStrings: Array[String] = util.Arrays.copyOf(arr, currentSize).sorted
-
-      val completions = sortedStrings.zipWithIndex
-        .map {
-          case (t, rank) => Completion(t, maxCompletionsCount - rank)
-        }
-
-      CompletionSet(completions)
-    }
-  }
-
-  /**
-    * efficiently add a string to fixed length array, as long the string doesn't already exist, and it isn't
-    * lexicographically greater than the greatest existing entry
-    * @return number of items in array
-    */
-  // scalastyle:off return
-  private def addToSet(arr: Array[String], currentSize: Int, maxSize: Int, s: String): Int = {
-    var i = 0
-    while (i < currentSize) {
-      if (arr(i) == s) {
-        return currentSize
-      }
-
-      i = i + 1
-    }
-
-    if (currentSize < maxSize) {
-      arr(currentSize) = s
-      return currentSize + 1
-    }
-
-    // find largest existing entry
-    var largest = 0
-    var j       = 1
-    while (j < maxSize) {
-      if (arr(largest) < arr(j)) {
-        largest = j
-      }
-
-      j = j + 1
-    }
-
-    // if s < largest existing, replace it in array
-    if (s < arr(largest)) {
-      arr(largest) = s
-    }
-
-    currentSize
-  }
-  // scalastyle:on return
-
   private object FuzzyParser {
     def apply(terms: Seq[String], similarityMeasure: (String, String) => Double, similarityThreshold: Int, maxCompletionsCount: Int): Parser[String] = {
       if (terms.isEmpty) {
@@ -193,7 +128,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       } else {
         val originals                 = trimmedNonEmptyTerms(terms)
         val normalized                = normalizedTerms(originals)
-        val completionsWhenInputEmpty = alphabeticalCompletions(originals, maxCompletionsCount)
+        val completionsWhenInputEmpty = alphabeticallySortedCompletions(originals, maxCompletionsCount)
         val trigramTermPairs =
           normalized.zip(originals).par.flatMap {
             case (normalizedTerm, originalTerm) =>
