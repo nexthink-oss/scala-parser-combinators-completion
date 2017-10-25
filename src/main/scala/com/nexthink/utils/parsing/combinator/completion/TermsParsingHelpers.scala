@@ -1,10 +1,3 @@
-/*                                                       *\
-**  scala-parser-combinators-completion                  **
-**  Copyright (c) by Nexthink S.A.                       **
-**  Lausanne, Switzerland (http://www.nexthink.com)      **
-**  Author: jonas.chapuis@nexthink.com                   **
-\*                                                       */
-
 package com.nexthink.utils.parsing.combinator.completion
 
 import com.nexthink.utils.collections.{PrefixMap, Trie}
