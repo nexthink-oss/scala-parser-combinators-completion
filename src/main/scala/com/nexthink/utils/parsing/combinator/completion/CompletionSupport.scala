@@ -195,7 +195,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return wrapper `Parser` instance specifying the completion tag meta-data
       */
     def %%(tagMeta: JValue): Parser[T] =
-      Parser(this, in => updateCompletionsSets(this.completions(in), set => CompletionSet(set.tag.updateMeta(tagMeta), set.completions)))
+      Parser(this, in => this.completions(in).map(set => CompletionSet(set.tag.updateMeta(tagMeta), set.completions)))
 
     /** An operator to specify the meta-data for completions of a parser (empty by default).
       * Note that meta-data is merged with comma separations when combining two equivalent entries.
@@ -203,7 +203,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return wrapper `Parser` instance specifying the completion meta-data
       */
     def %-%(meta: String): Parser[T] =
-      Parser(this, in => updateCompletionsSets(this.completions(in), set => CompletionSet(set.tag, set.entries.map(e => e.updateMeta(meta)))))
+      Parser(this, in => this.completions(in).map(set => CompletionSet(set.tag, set.entries.map(e => e.updateMeta(meta)))))
 
     /** An operator to specify the meta-data for completions of a parser in JSON format (empty by default)
       * Note that if the meta-data is encoded in JSON, it is automatically merged when combining two equivalent entries
@@ -240,6 +240,12 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     override def map[U](f: T => U): Parser[U] =
       Parser(super.map(f), completions)
 
+    def map[U](f: T => U, fc: Completion => Completion): Parser[U] =
+      map(f).mapCompletions(fc)
+
+    def mapCompletions(fc: Completion => Completion): Parser[T] =
+      Parser(this, in => this.completions(in).map(_.map(fc)))
+
     override def filter(p: T => Boolean): Parser[T] = withFilter(p)
 
     override def withFilter(p: T => Boolean): Parser[T] =
@@ -255,30 +261,16 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       }
     }
 
-    private def updateCompletionsSets(completions: Completions, updateSet: CompletionSet => CompletionSet) = {
-      Completions(completions.position,
-                  completions.meta,
-                  completions.sets.values
-                    .map(updateSet)
-                    .map(s => s.tag.label -> s)
-                    .toSeq)
-    }
-
     private def updateCompletionsTag(completions: Completions,
                                      newTagLabel: Option[String] = None,
                                      newTagScore: Option[Int] = None,
                                      newTagDescription: Option[String] = None,
                                      newTagKind: Option[String] = None) = {
-      def updateSet(existingSet: CompletionSet) =
-        CompletionSet(existingSet.tag.update(newTagLabel, newTagScore, newTagDescription, newTagKind), existingSet.completions)
-
-      updateCompletionsSets(completions, updateSet)
+      completions.map(existingSet => CompletionSet(existingSet.tag.update(newTagLabel, newTagScore, newTagDescription, newTagKind), existingSet.completions))
     }
 
     private def updateCompletionsMeta(completions: Completions, newMeta: String) = {
-      def updateSet(existingSet: CompletionSet) =
-        CompletionSet(existingSet.tag, existingSet.entries.map(e => e.updateMeta(newMeta)))
-      updateCompletionsSets(completions, updateSet)
+      completions.map(set => set.map(e => e.updateMeta(newMeta)))
     }
 
     /** A parser combinator for sequential composition.
