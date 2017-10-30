@@ -7,6 +7,7 @@
 package com.nexthink.utils.parsing.combinator.completion
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods.{compact, render}
+import org.json4s.JsonAST.JValue
 import org.junit.Assert._
 import org.junit.Test
 
@@ -16,17 +17,17 @@ class CompletionTypesTest extends CompletionTypes {
   override type Elem = Char
 
   val setA = CompletionSet(
-    CompletionTag("A", 10, "description").updateMeta("type" -> "a-type"),
-    Set(Completion("a", 2, Some("meta1")), Completion("b", 1).updateMeta(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some"))))
+    CompletionTag("A", 10, "description").withMeta("type" -> "a-type"),
+    Set(Completion("a", 2, Some("meta1"-> "1")), Completion("b", 1).withMeta(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some"))))
   )
 
   val setB = CompletionSet(CompletionTag("B", 5), Set(Completion("c", 4), Completion("d", 3)))
   val setC = CompletionSet("C", Completion("e", 10))
   val setAPrime = CompletionSet(
-    CompletionTag("A", 10).updateMeta("style" -> "highlight"),
+    CompletionTag("A", 10).withMeta("style" -> "highlight"),
     Set(
-      Completion("a", 4, Some("meta2")),
-      Completion("b", 1).updateMeta(("objects" -> Seq("users", "packages")) ~ ("themes" -> Seq("other"))),
+      Completion("a", 4, Some("meta2" -> "2")),
+      Completion("b", 1).withMeta(("objects" -> Seq("users", "packages")) ~ ("themes" -> Seq("other"))),
       Completion("aa")
     )
   )
@@ -54,26 +55,26 @@ class CompletionTypesTest extends CompletionTypes {
   @Test
   def completionsAtSamePositionAreMerged(): Unit = {
     // Act
-    val merged = Completions(Seq(setA, setB)).updateMeta("context" -> Seq("contextA")) | Completions(Seq(setAPrime, setC))
-      .updateMeta("context" -> Seq("contextB"))
+    val merged = Completions(Seq(setA, setB)).withMeta("context" -> Seq("contextA")) | Completions(Seq(setAPrime, setC))
+      .withMeta("context" -> Seq("contextB"))
 
     // Assert
     assertArrayEquals(
-      merged.allSets.toArray[AnyRef],
       Seq(
         CompletionSet(
-          CompletionTag("A", 10, "description").updateMeta(("type" -> "a-type") ~ ("style" -> "highlight")),
+          CompletionTag("A", 10, "description").withMeta(("type" -> "a-type") ~ ("style" -> "highlight")),
           Set(
-            Completion("a", 4, Some("meta1, meta2")),
-            Completion("b", 1).updateMeta(("objects" -> Seq("devices", "users", "packages")) ~ ("themes" -> Seq("some", "other"))),
+            Completion("a", 4, Some(("meta1" -> "1") ~ ("meta2" -> "2"): JValue)),
+            Completion("b", 1).withMeta(("objects" -> Seq("devices", "users", "packages")) ~ ("themes" -> Seq("some", "other"))),
             Completion("aa")
           )
         ),
         setB,
         setC
-      ).toArray[AnyRef]
+      ).toArray[AnyRef],
+      merged.allSets.toArray[AnyRef]
     )
-    assertEquals(Some(compact(render("context" -> Seq("contextA", "contextB")))), merged.meta)
+    assertEquals(Some("context" -> Seq("contextA", "contextB"): JValue), merged.meta)
   }
 
   @Test
