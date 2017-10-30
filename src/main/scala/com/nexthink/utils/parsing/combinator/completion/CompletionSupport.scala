@@ -240,11 +240,11 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     override def map[U](f: T => U): Parser[U] =
       Parser(super.map(f), completions)
 
-    def map[U](f: T => U, fc: Completion => Completion): Parser[U] =
+    def map[U](f: T => U, fc: Completions => Completions): Parser[U] =
       map(f).mapCompletions(fc)
 
-    def mapCompletions(fc: Completion => Completion): Parser[T] =
-      Parser(this, in => this.completions(in).map(_.map(fc)))
+    def mapCompletions(fc: Completions => Completions): Parser[T] =
+      Parser(this, in => fc(this.completions(in)))
 
     override def filter(p: T => Boolean): Parser[T] = withFilter(p)
 
