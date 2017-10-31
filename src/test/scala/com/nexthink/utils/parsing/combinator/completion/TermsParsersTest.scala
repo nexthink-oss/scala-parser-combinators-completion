@@ -142,7 +142,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
   property("parser with empty terms fails parsing") {
     forAll(Gen.alphaNumStr, termsParsers) { (someInput: String, parserCreator: (Seq[String]) => Parser[String]) =>
       val parser = parserCreator(Seq())
-      var result = parse(parser, someInput)
+      val result = parse(parser, someInput)
       result.successful shouldBe false
     }
   }
@@ -150,7 +150,7 @@ class TermsParsersTest extends PropSpec with PropertyChecks with Matchers with I
   property("parser with empty terms completes to empty") {
     forAll(Gen.alphaNumStr, termsParsers) { (someInput: String, parserCreator: (Seq[String]) => Parser[String]) =>
       val parser = parserCreator(Seq())
-      var result = complete(parser, someInput)
+      val result = complete(parser, someInput)
       result shouldBe Completions.empty
     }
   }
