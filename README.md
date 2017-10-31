@@ -1,3 +1,4 @@
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/387b9093be344220b72481cbf987cfae)](https://www.codacy.com/app/jchapuis/scala-parser-combinators-completion?utm_source=github.com&utm_medium=referral&utm_content=jchapuis/scala-parser-combinators-completion&utm_campaign=badger)
 [![Build status](https://travis-ci.org/jchapuis/scala-parser-combinators-completion.svg?branch=master)](https://travis-ci.org/jchapuis/scala-parser-combinators-completion)
 [![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Download](https://api.bintray.com/packages/jchapuis/maven/scala-parser-combinators-completion/images/download.svg) ](https://bintray.com/jchapuis/maven/scala-parser-combinators-completion/_latestVersion)
