@@ -1,6 +1,7 @@
 [![Build status](https://travis-ci.org/nexthink/scala-parser-combinators-completion.svg?branch=master)](https://travis-ci.org/jchapuis/scala-parser-combinators-completion)
 [![License](https://img.shields.io/:license-BSD3-blue.svg)](https://opensource.org/licenses/bsd-3-clause)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/387b9093be344220b72481cbf987cfae)](https://www.codacy.com/app/jchapuis/scala-parser-combinators-completion?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=jchapuis/scala-parser-combinators-completion&amp;utm_campaign=Badge_Grade)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.nexthink/scala-parser-combinators-completion_2.12/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.nexthink/scala-parser-combinators-completion_2.12)
 
 # scala-parser-combinators-completion
 Completion support for scala parser combinators.
