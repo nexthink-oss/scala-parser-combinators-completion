@@ -13,4 +13,4 @@ env:
 script:
 - sbt ++$TRAVIS_SCALA_VERSION ci-all
 after_success:
-- '[[ $TRAVIS_BRANCH == "master" ]] && { sbt publish; };'
+- '[[ $TRAVIS_BRANCH == "master" ]] && { sbt ++$TRAVIS_SCALA_VERSION release; };'

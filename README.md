@@ -1,6 +1,5 @@
-[![Build status](https://travis-ci.org/jchapuis/scala-parser-combinators-completion.svg?branch=master)](https://travis-ci.org/jchapuis/scala-parser-combinators-completion)
+[![Build status](https://travis-ci.org/nexthink/scala-parser-combinators-completion.svg?branch=master)](https://travis-ci.org/jchapuis/scala-parser-combinators-completion)
 [![License](https://img.shields.io/:license-BSD3-blue.svg)](https://opensource.org/licenses/bsd-3-clause)
-[![Download](https://api.bintray.com/packages/jchapuis/maven/scala-parser-combinators-completion/images/download.svg) ](https://bintray.com/jchapuis/maven/scala-parser-combinators-completion/_latestVersion)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/387b9093be344220b72481cbf987cfae)](https://www.codacy.com/app/jchapuis/scala-parser-combinators-completion?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=jchapuis/scala-parser-combinators-completion&amp;utm_campaign=Badge_Grade)
 
 # scala-parser-combinators-completion
@@ -20,7 +19,6 @@ A set of additional operators also allow overriding completions and specifying o
 Add the following lines to your `build.sbt` file:
  
  ```
- resolvers += Resolver.bintrayRepo("jchapuis", "maven")
  libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.0.8"
  ```
 
