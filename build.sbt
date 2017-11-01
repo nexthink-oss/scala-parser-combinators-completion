@@ -40,7 +40,7 @@ pgpSecretRing := baseDirectory.value / "project" / ".gnupg" / "secring.gpg"
 pgpPassphrase := sys.env.get("PGP_PASS").map(_.toArray)
 
 addCommandAlias("ci-all",  ";+clean ;+compile ;+coverage ;+test ;+package ;+coverageReport ;+codacyCoverage")
-addCommandAlias("release", ";+publishSigned ;sonatypeReleaseAll")
+addCommandAlias("release", ";+publishSigned ;sonatypeRelease")
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
