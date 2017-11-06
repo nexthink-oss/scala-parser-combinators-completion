@@ -1,8 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
 
 import org.json4s.JValue
-import org.json4s.native.JsonMethods.compact
-import org.json4s.native.JsonMethods.render
 
 import scala.language.implicitConversions
 import scala.util.parsing.combinator.Parsers

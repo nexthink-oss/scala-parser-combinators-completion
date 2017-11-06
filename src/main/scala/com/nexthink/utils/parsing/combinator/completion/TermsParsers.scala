@@ -3,8 +3,7 @@ package com.nexthink.utils.parsing.combinator.completion
 import com.nexthink.utils.collections.PrefixMap
 import com.nexthink.utils.collections.Trie
 import com.nexthink.utils.parsing.distance.DiceSorensenDistance.diceSorensenSimilarity
-import com.nexthink.utils.parsing.distance.trigramsWithAffixing
-import com.nexthink.utils.parsing.distance.tokenizeWords
+import com.nexthink.utils.parsing.distance.{trigramsWithAffixing, tokenizeWords}
 import com.nexthink.utils.collections.SortingHelpers.lazyQuicksort
 
 import scala.util.parsing.combinator.RegexParsers
@@ -14,8 +13,8 @@ import scala.util.parsing.combinator.RegexParsers
   * completion (supporting fuzzy matching)
   */
 trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsParsingHelpers with AlphabeticalSortingSupport {
-  private val DefaultSimilarityThreshold          = 20
-  private val CompletionCandidatesMultiplierRatio = 3
+  private val defaultSimilarityThreshold          = 20
+  private val completionCandidatesMultiplierRatio = 3
 
   /**
     * This defines a parser which parses any of the specified terms.
@@ -54,7 +53,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
   def oneOfTermsFuzzy(terms: Seq[String],
                       maxCompletionsCount: Int,
                       similarityMeasure: (String, String) => Double = diceSorensenSimilarity,
-                      similarityThreshold: Int = DefaultSimilarityThreshold): Parser[String] = {
+                      similarityThreshold: Int = defaultSimilarityThreshold): Parser[String] = {
     FuzzyParser(terms, similarityMeasure, similarityThreshold, maxCompletionsCount)
   }
 
@@ -127,7 +126,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
             case (normalizedTerm, originalTerm) =>
               tokenizeWords(normalizedTerm).flatMap(trigramsWithAffixing).map(trigram => trigram -> originalTerm)
           }
-        val ngramMap = PrefixMap(trigramTermPairs.groupBy(_._1).mapValues(_.map(_._2).toArray).toSeq.seq: _*)
+        val ngramMap = PrefixMap(trigramTermPairs.groupBy { case (trigram, _) => trigram }.mapValues(_.map { case (_, term) => term }.toArray).toSeq.seq: _*)
         val trie = Trie(normalized.zip(originals).map {
           case (normalizedTerm, originalTerm) => (normalizedTerm, originalTerm)
         }: _*)
@@ -157,7 +156,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       }
     }
 
-    private val maxCandidatesCount: Int = maxCompletionsCount * CompletionCandidatesMultiplierRatio
+    private val maxCandidatesCount: Int = maxCompletionsCount * completionCandidatesMultiplierRatio
 
     private def findAndScoreNgramMatches(ngrams: Seq[String]): Map[String, Int] = {
       def iter(ngram: String, remainingNgrams: Seq[String], termsFromPreviousIter: Set[String], acc: Map[String, Int]): Map[String, Int] = {

@@ -5,7 +5,6 @@ import org.junit.{Assert, Test}
 import scala.util.parsing.combinator.syntactical.StandardTokenParsers
 
 class CompletionForAcceptAndElemTest {
-
   object TestParser extends StandardTokenParsers with CompletionSupport
   import TestParser.lexical._
 
@@ -63,7 +62,7 @@ class CompletionForAcceptAndElemTest {
     // Arrange
     case class Number(n: Int)
     val tokens = Set[Token](NumericLit("1"), NumericLit("2"), NumericLit("3"))
-    val parser = TestParser.accept("number", {case NumericLit(n) => Number(n.toInt)}, tokens)
+    val parser = TestParser.accept("number", { case NumericLit(n) => Number(n.toInt) }, tokens)
 
     // Act
     val result = parser.completions(new Scanner(""))

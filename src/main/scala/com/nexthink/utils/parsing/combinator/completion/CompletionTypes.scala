@@ -198,7 +198,11 @@ trait CompletionTypes {
         assert(left.label == right.label, "Attempt to merge sets with different completion tags")
         CompletionSet(
           CompletionTag(left.tag.label, left.score.max(right.score), left.description.orElse(right.description), mergeMetaData(left.meta, right.meta)),
-          left.completions.merged(right.completions)((l, r) => (l._1, mergeCompletion(l._2, r._2)))
+          left.completions.merged(right.completions)((l, r) => {
+            val (leftLabel, leftCompletion) = l
+            val (_, rightCompletion) = r
+            (leftLabel, mergeCompletion(leftCompletion, rightCompletion))
+          })
         )
       }
     }
@@ -210,7 +214,11 @@ trait CompletionTypes {
           other.position match {
             case otherPos if otherPos < position => this
             case otherPos if otherPos == position =>
-              Completions(position, mergeMetaData(meta, other.meta), sets.merged(other.sets)((l, r) => (l._1, mergeSets(l._2, r._2))))
+              Completions(position, mergeMetaData(meta, other.meta), sets.merged(other.sets)((l, r) => {
+                val (leftLabel, leftCompletion) = l
+                val (_, rightCompletions) = r
+                (leftLabel, mergeSets(leftCompletion, rightCompletions))
+              }))
             case _ => other
           }
       }

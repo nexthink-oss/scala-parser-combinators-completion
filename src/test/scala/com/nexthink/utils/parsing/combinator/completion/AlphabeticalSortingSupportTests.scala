@@ -2,12 +2,11 @@ package com.nexthink.utils.parsing.combinator.completion
 
 import java.util.Random
 
-import org.junit.Assert
-import org.junit.Test
-
-object testParser extends AlphabeticalSortingSupport
+import org.junit.{Assert, Test}
 
 class AlphabeticalSortingSupportTests {
+  object testParser extends AlphabeticalSortingSupport
+
   private val rand       = new Random(75483758457L)
   private val fixedList  = (0 to 10000).reverse.flatMap(i => List("a" + i, "a" + i))
   private val randomList = (0 to 10000).reverse.flatMap(i => List("a" + rand.nextInt(), "a" + rand.nextInt()))
