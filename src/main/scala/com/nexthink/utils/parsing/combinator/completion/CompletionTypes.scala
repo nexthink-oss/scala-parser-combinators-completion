@@ -25,7 +25,6 @@ import scala.collection.immutable
   *  Note that specifying tags and sets is optional: if no tag is specified upon creation,
   *  `Completions` instances create a unique default set with an empty tag.
   *
-  *  @author Jonas Chapuis
   */
 trait CompletionTypes {
   type Elem
@@ -40,16 +39,15 @@ trait CompletionTypes {
     * @param description tag description (optional) - can be used for additional information e.g. for a tooltip
     * @param meta tag meta (optional) - can be used e.g. to define visual style
     */
-  case class CompletionTag(label: String, score: Int, description: Option[String], meta: Option[String]) {
-    def update(newTag: Option[String], newScore: Option[Int], newDescription: Option[String], newMeta: Option[String]): CompletionTag =
+  case class CompletionTag(label: String, score: Int, description: Option[String], meta: Option[JValue]) {
+    def update(newTag: Option[String], newScore: Option[Int], newDescription: Option[String], newMeta: Option[JValue]): CompletionTag =
       copy(
         label = newTag.getOrElse(label),
         score = newScore.getOrElse(score),
         description = newDescription.map(Some(_)).getOrElse(description),
         meta = newMeta.map(Some(_)).getOrElse(meta)
       )
-
-    def updateMeta(newMeta: JValue): CompletionTag = copy(meta = Some(encodeJson(newMeta)))
+    def withMeta(newMeta: JValue): CompletionTag = copy(meta = Some(newMeta))
 
     private[CompletionTypes] def serializeJson: json4s.JObject = {
       ("label" -> label) ~ ("score" -> score) ~ ("description" -> description) ~ ("meta" -> meta)
@@ -64,8 +62,12 @@ trait CompletionTypes {
       CompletionTag(DefaultCompletionTag, DefaultCompletionScore, None, None)
     def apply(label: String): CompletionTag =
       CompletionTag(label, DefaultCompletionScore, None, None)
+    def apply(label: String, meta: JValue): CompletionTag =
+      CompletionTag(label, DefaultCompletionScore, None, Some(meta))
     def apply(label: String, score: Int): CompletionTag =
       CompletionTag(label, score, None, None)
+    def apply(label: String, score: Int, meta: JValue): CompletionTag =
+      CompletionTag(label, score, None, Some(meta))
     def apply(label: String, score: Int, description: String): CompletionTag =
       CompletionTag(label, score, Some(description), None)
   }
@@ -75,13 +77,14 @@ trait CompletionTypes {
     * @param completions set of unique completion entries
     */
   case class CompletionSet(tag: CompletionTag, completions: immutable.HashMap[Elems, Completion]) {
-    def label: String                  = tag.label
-    def score: Int                     = tag.score
-    def description: Option[String]    = tag.description
-    def meta: Option[String]           = tag.meta
-    def entries: Iterable[Completion]  = completions.values
-    def sortedEntries: Seq[Completion] = entries.toSeq.sorted
-    def stringEntries: Seq[String]     = sortedEntries.map(_.value.toString)
+    def label: String                    = tag.label
+    def score: Int                       = tag.score
+    def description: Option[String]      = tag.description
+    def meta: Option[JValue]             = tag.meta
+    def entries: Iterable[Completion]    = completions.values
+    def sortedEntries: Seq[Completion]   = entries.toSeq.sorted
+    def stringEntries: Seq[String]       = sortedEntries.map(_.value.toString)
+    def map(f: Completion => Completion) = CompletionSet(tag, completions.values.map(f).toSeq)
 
     private[CompletionTypes] def serializeJson =
       ("tag" -> tag.serializeJson) ~ ("completions" -> entries.map(_.serializeJson).toList)
@@ -129,10 +132,9 @@ trait CompletionTypes {
     * @param score entry score (defines the order of entries within a set, the higher the better)
     * @param meta entry meta (e.g. visual style)
     */
-  case class Completion(value: Elems, score: Int = DefaultCompletionScore, meta: Option[String] = None) {
+  case class Completion(value: Elems, score: Int = DefaultCompletionScore, meta: Option[JValue] = None) {
     require(value.nonEmpty, "empty completion")
-    def updateMeta(newMeta: JValue): Completion = updateMeta(encodeJson(newMeta))
-    def updateMeta(newMeta: String): Completion = copy(meta = Some(newMeta))
+    def withMeta(newMeta: JValue): Completion = copy(meta = Some(newMeta))
 
     private[CompletionTypes] def serializeJson = ("value" -> value.toString()) ~ ("score" -> score) ~ ("meta" -> meta)
 
@@ -150,16 +152,15 @@ trait CompletionTypes {
     * @param position position in the input where completion entries apply
     * @param sets completion entries, grouped per tag
     */
-  case class Completions(position: Position, meta: Option[String], sets: immutable.HashMap[String, CompletionSet]) {
+  case class Completions(position: Position, meta: Option[JValue], sets: immutable.HashMap[String, CompletionSet]) {
     def isEmpty: Boolean                               = sets.isEmpty
     def nonEmpty: Boolean                              = !isEmpty
     def setWithTag(tag: String): Option[CompletionSet] = sets.get(tag)
     def allSets: Iterable[CompletionSet]               = sets.values.toSeq.sorted
     def allCompletions: Iterable[Completion]           = allSets.flatMap(_.sortedEntries)
     def defaultSet: Option[CompletionSet]              = sets.get("")
-    def updateMeta(newMeta: JValue): Completions       = updateMeta(encodeJson(newMeta))
-    def updateMeta(newMeta: String): Completions       = copy(meta = Some(newMeta))
-
+    def withMeta(newMeta: JValue): Completions         = copy(meta = Some(newMeta))
+    def map(f: CompletionSet => CompletionSet)         = Completions(position, meta, sets.values.map(f).toSeq)
     private def serializeJson =
       ("position" -> (("line" -> position.line) ~ ("column" -> position.column))) ~ ("meta" -> meta) ~ ("sets" -> allSets.map(_.serializeJson))
 
@@ -167,32 +168,39 @@ trait CompletionTypes {
     def toJson: JValue            = serializeJson
     def setsToJson: JArray        = allSets.map(_.serializeJson)
 
-    private def mergeMetaData(left: Option[String], right: Option[String]) = (left, right) match {
-      case (Some(l), Some(r)) =>
-        (parseOpt(l), parseOpt(r)) match {
-          case (Some(lJson), Some(rJson)) => Some(encodeJson(lJson merge rJson))
-          case _                          => Some(Seq(l, r).mkString(", "))
+    private def mergeMetaData(left: Option[JValue], right: Option[JValue]) =
+      if (left == right) left
+      else
+        (left, right) match {
+          case (Some(l), Some(r)) => Some(l merge r)
+          case (Some(l), None)    => Some(l)
+          case (None, Some(r))    => Some(r)
+          case (None, None)       => None
         }
-      case (Some(l), None) => Some(l)
-      case (None, Some(r)) => Some(r)
-      case (None, None)    => None
-    }
 
     private def mergeCompletion(left: Completion, right: Completion): Completion = {
-      assert(left.value == right.value, "Attempt to merge different completion entries")
-      Completion(
-        left.value,
-        left.score.max(right.score),
-        mergeMetaData(left.meta, right.meta)
-      )
+      if (left == right) {
+        left
+      } else {
+        assert(left.value == right.value, "Attempt to merge different completion entries")
+        Completion(
+          left.value,
+          left.score.max(right.score),
+          mergeMetaData(left.meta, right.meta)
+        )
+      }
     }
 
     private def mergeSets(left: CompletionSet, right: CompletionSet): CompletionSet = {
-      assert(left.label == right.label, "Attempt to merge sets with different completion tags")
-      CompletionSet(
-        CompletionTag(left.tag.label, left.score.max(right.score), left.description.orElse(right.description), mergeMetaData(left.meta, right.meta)),
-        left.completions.merged(right.completions)((l, r) => (l._1, mergeCompletion(l._2, r._2)))
-      )
+      if (left == right) {
+        left
+      } else {
+        assert(left.label == right.label, "Attempt to merge sets with different completion tags")
+        CompletionSet(
+          CompletionTag(left.tag.label, left.score.max(right.score), left.description.orElse(right.description), mergeMetaData(left.meta, right.meta)),
+          left.completions.merged(right.completions)((l, r) => (l._1, mergeCompletion(l._2, r._2)))
+        )
+      }
     }
 
     def |(other: Completions): Completions = {
@@ -218,11 +226,10 @@ trait CompletionTypes {
     def takeTop(count: Int): Completions = {
       val allEntries = allSets.toStream.flatMap(s => s.entries.toStream.map((_, s.tag)))
       val sortedEntries =
-        lazyQuicksort(allEntries)(Ordering.by{
-            case (Completion(_, score, _), CompletionTag(_, tagScore, _, _)) =>
-              (-tagScore, -score)
-          })
-          .take(count).toList
+        lazyQuicksort(allEntries)(Ordering.by {
+          case (Completion(_, score, _), CompletionTag(_, tagScore, _, _)) =>
+            (-tagScore, -score)
+        }).take(count).toList
       val regroupedSets = sortedEntries
         .groupBy { case (_, tag) => tag }
         .map {
@@ -241,22 +248,30 @@ trait CompletionTypes {
   private def printJson(meta: JValue)  = pretty(render(meta))
 
   case object Completions {
-    def apply(position: Position, meta: Option[String], completionSets: Seq[(String, CompletionSet)]): Completions =
+    def apply(position: Position, meta: Option[JValue], completionSets: Seq[(String, CompletionSet)]): Completions =
       Completions(position, meta, immutable.HashMap(completionSets: _*))
+
     def apply(position: Position, completionSet: CompletionSet): Completions =
       Completions(position, None, Seq(completionSet.tag.label -> completionSet))
-    def apply(position: Position, meta: Option[String], completionSet: CompletionSet): Completions =
-      Completions(position, None, Seq(completionSet.tag.label -> completionSet))
-    def apply(position: Position, meta: Option[String], completions: Traversable[Elems]): Completions =
+
+    def apply(position: Position, meta: Option[JValue], completionSet: CompletionSet): Completions =
+      Completions(position, meta, Seq(completionSet.tag.label -> completionSet))
+
+    def apply(position: Position, meta: Option[JValue], completions: Traversable[Elems]): Completions =
       Completions(position, meta, CompletionSet(completions))
+
     def apply(position: Position, completions: Traversable[Elems]): Completions =
       Completions(position, None, CompletionSet(completions))
-    def apply(position: Position, meta: Option[String], completionSets: Iterable[CompletionSet]): Completions =
+
+    def apply(position: Position, meta: Option[JValue], completionSets: Iterable[CompletionSet]): Completions =
       Completions(position, meta, completionSets.map(s => s.tag.label -> s).toSeq)
+
     def apply(position: Position, completionSets: Iterable[CompletionSet]): Completions =
       Completions(position, None, completionSets.map(s => s.tag.label -> s).toSeq)
+
     def apply(completionSet: CompletionSet): Completions =
       Completions(NoPosition, None, completionSet)
+
     def apply(completionSets: Iterable[CompletionSet]): Completions =
       Completions(NoPosition, None, completionSets.map(s => s.tag.label -> s).toSeq)
 

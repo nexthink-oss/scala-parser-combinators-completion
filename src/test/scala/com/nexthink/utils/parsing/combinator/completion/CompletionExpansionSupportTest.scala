@@ -1,7 +1,9 @@
 package com.nexthink.utils.parsing.combinator.completion
 
 import com.nexthink.utils.parsing.combinator.completion.CompletionTestDefinitions.Tagged
+import org.json4s.JsonAST.JValue
 import org.junit.{Assert, Test}
+import org.json4s.JsonDSL._
 
 import scala.util.parsing.combinator.Parsers
 
@@ -30,11 +32,12 @@ class CompletionExpansionSupportTest {
   }
 
   object InfiniteExpressionParser extends Parsers with CompletionExpansionSupport with CompletionTestParser {
+    val globalMeta: JValue = ("expansions" -> "global")
     val fox                      = "the quick brown fox"
     val jumpsOver                = "which jumps over the lazy" % "action"
     val jumpsOverDogOrCat        = jumpsOver ~ ("dog" | "cat") % "animal" %? "dogs and cats" % 10
     lazy val parser              = jumpsOverDogOrCat | jumpsOverDogOrCat ~ which()
-    def which(): Parser[Any]     = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat) %%% "expansions"
+    def which(): Parser[Any]     = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat) %%% globalMeta
     lazy val infiniteDogsAndCats = fox ~ which
   }
 
@@ -69,7 +72,7 @@ class CompletionExpansionSupportTest {
   @Test
   def infiniteExpressionExpansionIncludesGlobalMeta(): Unit = {
     val completions = InfiniteExpressionParser.complete(InfiniteExpressionParser.infiniteDogsAndCats, "the quick brown fox  ")
-    Assert.assertEquals(Some("expansions"), completions.meta)
+    Assert.assertEquals(Some(InfiniteExpressionParser.globalMeta), completions.meta)
   }
 
   @Test

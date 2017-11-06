@@ -1,7 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
-
-import java.util
-
+import org.json4s.JsonAST.JValue
+import org.json4s.JsonDSL._
 import org.junit.{Assert, Test}
 
 import scala.util.parsing.combinator.Parsers
@@ -19,7 +18,7 @@ class CompletionOperatorsTest {
     val score                       = 10
     val description                 = "some description"
     val tag                         = "some tag"
-    val meta                        = "some meta"
+    val meta: JValue                = ("some foo" -> "some bar")
 
     assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score) %? description %% meta,
                            completions,
@@ -28,12 +27,7 @@ class CompletionOperatorsTest {
                            Some(description),
                            Some(meta))
 
-    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score, description),
-                           completions,
-                           Some(tag),
-                           Some(score),
-                           Some(description),
-                           None)
+    assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score, description), completions, Some(tag), Some(score), Some(description), None)
 
     assertCompletionsMatch(TestParser.someParser %> (completions: _*) % (tag, score, description, meta),
                            completions,
@@ -71,7 +65,7 @@ class CompletionOperatorsTest {
                                 tag: Option[String],
                                 score: Option[Int],
                                 description: Option[String],
-                                meta: Option[String]): Unit = {
+                                meta: Option[JValue]): Unit = {
     // Act
     val result = TestParser.complete(sut, "")
 
@@ -88,7 +82,7 @@ class CompletionOperatorsTest {
   @Test
   def topCompletionsLimitsCompletionsAccordingToScore(): Unit = {
     // Arrange
-    val meta = "meta"
+    val meta: JValue                = ("some foo" -> "some bar")
     val completions = Seq("one", "two", "three", "four").zipWithIndex.map {
       case (c, s) => TestParser.Completion(c, s)
     }
