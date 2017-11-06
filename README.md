@@ -20,7 +20,7 @@ A set of additional operators also allow overriding completions and specifying o
 Add the following lines to your `build.sbt` file:
  
  ```
- libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.0.8"
+ libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.0.9"
  ```
 
 ## Completing on a grammar
