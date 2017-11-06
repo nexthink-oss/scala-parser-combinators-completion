@@ -1,9 +1,3 @@
-/*                                                      *\
-**  scala-parser-combinators completion extensions      **
-**  Copyright (c) by Nexthink S.A.                      **
-**  Lausanne, Switzerland (http://www.nexthink.com)     **
-\*                                                      */
-
 package com.nexthink.utils.parsing.combinator.completion
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods.{compact, render}

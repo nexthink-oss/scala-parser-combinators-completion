@@ -1,17 +1,10 @@
-/*                                                       *\
-**  scala-parser-combinators-completion                  **
-**  Copyright (c) by Nexthink S.A.                       **
-**  Lausanne, Switzerland (http://www.nexthink.com)      **
-**  Author: jonas.chapuis@nexthink.com                   **
-\*                                                       */
-
 package com.nexthink.utils.parsing.combinator.completion
 
 import org.json4s
 import org.json4s.{JArray, JValue}
 
 import scala.util.parsing.input.{NoPosition, Position}
-import com.nexthink.utils.collections.lazyQuicksort
+import com.nexthink.utils.collections.SortingHelpers.lazyQuicksort
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 

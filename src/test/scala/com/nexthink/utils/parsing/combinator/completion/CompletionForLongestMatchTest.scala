@@ -1,8 +1,3 @@
-/*                                                      *\
-**  scala-parser-combinators completion extensions      **
-**  Copyright (c) by Nexthink S.A.                      **
-**  Lausanne, Switzerland (http://www.nexthink.com)     **
-\*                                                      */
 package com.nexthink.utils.parsing.combinator.completion
 
 import org.junit.Assert._
