@@ -242,7 +242,7 @@ trait CompletionTypes {
         .groupBy { case (_, tag) => tag }
         .map {
           case (groupTag, completions) =>
-            CompletionSet(groupTag, completions.map(c => c._1))
+            CompletionSet(groupTag, completions.map{case (c, _) => c})
         }
       Completions(position, meta, regroupedSets.map(s => s.tag.label -> s).toSeq)
     }

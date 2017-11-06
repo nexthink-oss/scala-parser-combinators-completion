@@ -201,7 +201,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
     private def findCandidateMatches(incompleteTerm: String): Seq[(String, Int)] = {
       val trigrams                        = trigramsWithAffixing(incompleteTerm.toLowerCase)
       val matchingTerms: Map[String, Int] = findAndScoreNgramMatches(trigrams)
-      matchingTerms.toSeq.sortBy(_._2).view.reverse.take(maxCandidatesCount)
+      matchingTerms.toSeq.sortBy { case (_, score) => score }.view.reverse.take(maxCandidatesCount)
     }
   }
 
