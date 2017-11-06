@@ -1,7 +1,7 @@
 name := "scala-parser-combinators-completion"
 organization := "com.nexthink"
 licenses += ("BSD-3", url("https://opensource.org/licenses/bsd-3-clause"))
-version := "1.0.8"
+version := "1.0.9"
 scalaVersion := "2.12.2"
 homepage := Some(url("https://github.com/nexthink/scala-parser-combinators-completion"))
 scmInfo := Some(ScmInfo(url(
