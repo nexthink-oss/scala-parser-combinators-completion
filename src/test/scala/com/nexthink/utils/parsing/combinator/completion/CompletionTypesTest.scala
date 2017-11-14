@@ -1,6 +1,5 @@
 package com.nexthink.utils.parsing.combinator.completion
 import org.json4s.JsonDSL._
-import org.json4s.native.JsonMethods.{compact, render}
 import org.json4s.JsonAST.JValue
 import org.junit.Assert._
 import org.junit.Test

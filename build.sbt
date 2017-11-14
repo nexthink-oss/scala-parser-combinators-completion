@@ -4,17 +4,15 @@ licenses += ("BSD-3", url("https://opensource.org/licenses/bsd-3-clause"))
 version := "1.0.9"
 scalaVersion := "2.12.2"
 homepage := Some(url("https://github.com/nexthink/scala-parser-combinators-completion"))
-scmInfo := Some(ScmInfo(url(
-  "https://github.com/nexthink/scala-parser-combinators-completion"),
-  "git@github.com:nexthink/scala-parser-combinators-completions.git"))
+scmInfo := Some(
+  ScmInfo(url("https://github.com/nexthink/scala-parser-combinators-completion"), "git@github.com:nexthink/scala-parser-combinators-completions.git"))
 developers := List(
   Developer(
-    id="jchapuis",
-    name="Jonas Chapuis",
-    email="jonas.chapuis@nexthink.com",
-    url=url("https://jonaschapuis.com")
+    id = "jchapuis",
+    name = "Jonas Chapuis",
+    email = "jonas.chapuis@nexthink.com",
+    url = url("https://jonaschapuis.com")
   ))
-
 
 // Add sonatype repository settings
 isSnapshot := version.value endsWith "SNAPSHOT"
@@ -26,11 +24,10 @@ publishTo := Some(
 )
 
 // Sonatype credentials
-  credentials += Credentials(
-    "Sonatype Nexus Repository Manager",
-    "oss.sonatype.org",
-    sys.env.getOrElse("SONATYPE_USER", ""),
-    sys.env.getOrElse("SONATYPE_PASSWORD", ""))
+credentials += Credentials("Sonatype Nexus Repository Manager",
+                           "oss.sonatype.org",
+                           sys.env.getOrElse("SONATYPE_USER", ""),
+                           sys.env.getOrElse("SONATYPE_PASSWORD", ""))
 
 // PGP signing
 useGpg := false // built-in implementation
@@ -39,8 +36,10 @@ pgpPublicRing := baseDirectory.value / "project" / ".gnupg" / "pubring.gpg"
 pgpSecretRing := baseDirectory.value / "project" / ".gnupg" / "secring.gpg"
 pgpPassphrase := sys.env.get("PGP_PASS").map(_.toArray)
 
-addCommandAlias("ci-all",  ";+clean ;+compile ;+coverage ;+test ;+package ;+coverageReport ;+codacyCoverage")
+addCommandAlias("ci-all", ";+clean ;+compile ;+coverage ;+test ;+package ;+coverageReport ;+codacyCoverage")
 addCommandAlias("release", ";+publishSigned ;sonatypeRelease")
+
+scalacOptions += "-Ypartial-unification"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
@@ -48,4 +47,13 @@ libraryDependencies ++= Seq(
   "com.novocode"           % "junit-interface"           % "0.11" % Test,
   "org.scalacheck"         %% "scalacheck"               % "1.13.4" % Test,
   "org.scalatest"          %% "scalatest"                % "3.0.1" % Test
+)
+
+// cats & monix
+libraryDependencies ++= Seq(
+  "io.monix" %% "monix-eval" % "2.3.0",
+  "io.monix" %% "monix-cats" % "2.3.0",
+  "org.typelevel" %% "cats-laws"    % "1.0.0-MF" % Test,
+  "org.typelevel" %% "cats-testkit" % "1.0.0-MF" % Test,
+  "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test
 )
