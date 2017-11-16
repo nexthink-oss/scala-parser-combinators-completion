@@ -31,7 +31,7 @@ class CompletionExpansionSupportTest {
     Assert.assertEquals(completions.length, 162)
   }
 
-  object InfiniteExpressionParser extends Parsers with CompletionExpansionSupport with CompletionTestParser {
+  object InfiniteExpressionParser extends Parsers with CompletionExpansionSupport with CompletionTestAsserters {
     val globalMeta: JValue = ("expansions" -> "global")
     val fox                      = "the quick brown fox"
     val jumpsOver                = "which jumps over the lazy" % "action"

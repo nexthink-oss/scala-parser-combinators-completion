@@ -18,7 +18,7 @@ object CompletionTestDefinitions {
   }
 }
 
-trait CompletionTestParser extends Parsers with RegexCompletionSupport {
+trait CompletionTestAsserters extends CompletionTypes {
   import CompletionTestDefinitions._
   def assertSetEquals(expected: AssertionSet, actual: CompletionSet): Unit =
     expected match {

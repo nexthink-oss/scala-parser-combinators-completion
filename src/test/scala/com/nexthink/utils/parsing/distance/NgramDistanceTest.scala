@@ -8,7 +8,6 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
 
-@RunWith(classOf[JUnitRunner])
 class NgramDistanceTest extends PropSpec with PropertyChecks with Matchers {
 
   property("correct distances for concrete examples") {

@@ -5,7 +5,7 @@ import org.junit.Test
 class CompletionForSimpleGrammarTest {
   import CompletionTestDefinitions._
 
-  object SimpleGrammar extends CompletionTestParser {
+  object SimpleGrammar extends CompletionTestAsserters with RegexCompletionSupport {
     val number = "[0-9]+".r %> ("1", "10", "99") % "number" %? "any number"
 
     def expr: Parser[Int] = term | "(" ~> term <~ ")"
