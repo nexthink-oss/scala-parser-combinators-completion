@@ -1,11 +1,11 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.junit.Assert._
-import org.junit.Test
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
 
 import scala.util.parsing.combinator.RegexParsers
 
-class CompletionForIntoTest {
+class CompletionForIntoTest extends FlatSpec with Matchers {
   val animal = "animal"
   val machine = "machine"
   val bear = "bear"
@@ -17,15 +17,15 @@ class CompletionForIntoTest {
     val test          = (animal | machine) >> { meta: String => if (meta == animal) animalParser else machineParser }
   }
 
-  @Test
-  def intoParserWithoutSuccessCompletesToParser(): Unit = {
+  "intoParser without success" should "complete to parser" in {
     val completions = TestParser.completeString(TestParser.test, "")
-    assertEquals(Seq(animal, machine), completions)
+    Seq(animal, machine) shouldBe completions
   }
 
-  @Test
-  def intoParserWithSuccessCompletesResultingParser(): Unit = {
+  "intoParser with success" should "complete resulting parser" in {
     val completions = TestParser.completeString(TestParser.test, animal)
-    assertEquals(Seq(bear, lion), completions)
+    Seq(bear, lion) shouldBe completions
   }
+
+
 }

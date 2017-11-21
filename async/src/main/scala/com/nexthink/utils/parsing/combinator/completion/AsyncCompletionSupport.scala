@@ -31,7 +31,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       override def completions(in: Input): Task[Completions] = ac(in)
     }
 
-  abstract class AsyncParser[+T] extends (Input => Task[ParseResult[T]]) {
+  abstract class AsyncParser[+T] extends (Input => Task[ParseResult[T]]) with CombinableParser[T, AsyncParser] {
     private var name: String        = ""
     def named(n: String): this.type = { name = n; this }
     override def toString()         = "AsyncParser (" + name + ")"
@@ -211,6 +211,10 @@ trait AsyncCompletionSupport extends CompletionSupport {
 
     def map[U](f: T => U): AsyncParser[U] =
       AsyncParser(in => this(in).map(_.map(f)), completions)
+
+    def mapCompletions(fc: Completions => Completions): AsyncParser[T] = AsyncParser(this, in => this.completions(in).map(fc))
+
+    def map[U](f: T => U, fc: Completions => Completions): AsyncParser[U] = AsyncParser(this.map(f), this.mapCompletions(fc).completions)
 
     def filter(p: T => Boolean): AsyncParser[T] = withFilter(p)
 
@@ -437,24 +441,24 @@ trait AsyncCompletionSupport extends CompletionSupport {
     def * = rep(this)
 
     /** Returns a parser that repeatedly parses what this parser parses,
-      *  interleaved with the `sep` parser. The `sep` parser specifies how
-      *  the results parsed by this parser should be combined.
+      * interleaved with the `sep` parser. The `sep` parser specifies how
+      * the results parsed by this parser should be combined.
       *
-      *  @return chainl1(this, sep)
+      * @return chainl1(this, sep)
       */
-    def *[U >: T](sep: => Parser[(U, U) => U]) = chainl1(this, sep)
+    def *[U >: T](sep: => AsyncParser[(U, U) => U]) = chainl1(this, sep)
 
     /** Returns a parser that repeatedly (at least once) parses what this parser parses.
       *
       *  @return rep1(this)
       */
-    def + = rep1(this)
+    def +() = rep1(this)
 
     /** Returns a parser that optionally parses what this parser parses.
       *
       *  @return opt(this)
       */
-    def ? = opt(this)
+    def ?() = opt(this)
 
     /** Changes the failure message produced by a parser.
       *
