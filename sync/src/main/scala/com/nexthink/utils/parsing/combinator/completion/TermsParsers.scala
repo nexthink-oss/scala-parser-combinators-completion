@@ -1,10 +1,10 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import com.nexthink.utils.collections.PrefixMap
-import com.nexthink.utils.collections.Trie
+import com.nexthink.utils.parsing.collections.PrefixMap
+import com.nexthink.utils.parsing.collections.Trie
 import com.nexthink.utils.parsing.distance.DiceSorensenDistance.diceSorensenSimilarity
 import com.nexthink.utils.parsing.distance.{trigramsWithAffixing, tokenizeWords}
-import com.nexthink.utils.collections.SortingHelpers.lazyQuicksort
+import com.nexthink.utils.parsing.collections.SortingHelpers.lazyQuicksort
 
 import scala.util.parsing.combinator.RegexParsers
 

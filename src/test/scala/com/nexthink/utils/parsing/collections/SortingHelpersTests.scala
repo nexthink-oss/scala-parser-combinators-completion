@@ -1,9 +1,9 @@
-package com.nexthink.utils.collections
+package com.nexthink.utils.parsing.collections
 
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.nexthink.utils.collections.SortingHelpers.lazyQuicksort
+import com.nexthink.utils.parsing.collections.SortingHelpers.lazyQuicksort
 
 
 class SortingHelpersTests extends PropSpec with PropertyChecks with Matchers {

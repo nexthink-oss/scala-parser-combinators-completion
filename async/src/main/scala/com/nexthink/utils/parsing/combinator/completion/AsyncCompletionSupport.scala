@@ -1,26 +1,15 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import java.io
-
 import cats._
 import cats.implicits._
 import cats.kernel.Monoid
 import monix.eval.Task
-import monix.cats.monixToCatsFunctor
-import monix.execution.Scheduler
 import org.json4s.JValue
 
-import scala.collection.immutable.PagedSeq
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 import scala.language.higherKinds
-import scala.util.matching.Regex
 import scala.util.parsing.input.Positional
 import scala.util.parsing.input.NoPosition
-import scala.util.parsing.input.Reader
-import scala.util.parsing.input.CharSequenceReader
-import scala.util.parsing.input.PagedSeqReader
 
 trait AsyncCompletionSupport extends CompletionSupport {
   implicit val completionsMonoid: Monoid[Completions] =
@@ -77,8 +66,9 @@ trait AsyncCompletionSupport extends CompletionSupport {
     private def seqCompletions[U](in: Input, other: => AsyncParser[U]): Task[Completions] = {
       lazy val thisCompletions = this.completions(in)
       this(in) flatMap {
-        case Success(_, _) =>
-          thisCompletions |+| other.completions(in)
+        case Success(_, rest) => {
+          thisCompletions |+| other.completions(rest)
+        }
         case NoSuccess(_, _) =>
           thisCompletions
       }
@@ -808,49 +798,4 @@ trait AsyncCompletionSupport extends CompletionSupport {
       AsyncParser(for (a <- this; b <- commit(p)) yield new ~(a, b), super.~(p).completions).named("~")
   }
 
-}
-
-trait AsyncRegexCompletionSupport extends RegexCompletionSupport with AsyncCompletionSupport {
-
-  implicit def asyncLiteral(s: String): AsyncParser[String] = super.literal(s)
-  implicit def asyncRegex(r: Regex): AsyncParser[String]    = super.regex(r)
-
-  /** Parse some prefix of reader `in` with parser `p`. */
-  def parseAsync[T](p: AsyncParser[T], in: Reader[Char]): Task[ParseResult[T]] =
-    p(in)
-
-  /** Parse some prefix of character sequence `in` with parser `p`. */
-  def parseAsync[T](p: AsyncParser[T], in: java.lang.CharSequence): Task[ParseResult[T]] =
-    p(new CharSequenceReader(in))
-
-  /** Parse some prefix of reader `in` with parser `p`. */
-  def parseAsync[T](p: AsyncParser[T], in: java.io.Reader): Task[ParseResult[T]] =
-    p(new PagedSeqReader(PagedSeq.fromReader(in)))
-
-  /** Returns completions for read `in` with parser `p`. */
-  def completeAsync[T](p: AsyncParser[T], in: Reader[Char]): Task[Completions] =
-    p.completions(in)
-
-  /** Returns completions for character sequence `in` with parser `p`. */
-  def completeAsync[T](p: AsyncParser[T], in: CharSequence): Task[Completions] =
-    p.completions(new CharSequenceReader(in))
-
-  /** Returns flattened string completions for character sequence `in` with parser `p`. */
-  def completeStringAsync[T](p: AsyncParser[T], input: String): Task[Seq[String]] =
-    completeAsync(p, input).map(_.completionStrings)
-
-  def parse[T](p: AsyncParser[T], in: Reader[Char])(implicit s: Scheduler): ParseResult[T] = Await.result(parseAsync(p, in).runAsync(s), Duration.Inf)
-
-  def parse[T](p: AsyncParser[T], in: CharSequence)(implicit s: Scheduler) = Await.result(parseAsync(p, in).runAsync(s), Duration.Inf)
-
-  def parse[T](p: AsyncParser[T], in: io.Reader)(implicit s: Scheduler) = Await.result(parseAsync(p, in).runAsync(s), Duration.Inf)
-
-  /** Returns completions for read `in` with parser `p`. */
-  def complete[T](p: AsyncParser[T], in: Reader[Char])(implicit s: Scheduler) = Await.result(completeAsync(p, in).runAsync(s), Duration.Inf)
-
-  /** Returns completions for character sequence `in` with parser `p`. */
-  def complete[T](p: AsyncParser[T], in: CharSequence)(implicit s: Scheduler) = Await.result(completeAsync(p, in).runAsync(s), Duration.Inf)
-
-  /** Returns flattened string completions for character sequence `in` with parser `p`. */
-  def completeString[T](p: AsyncParser[T], input: String)(implicit s: Scheduler) = Await.result(completeStringAsync(p, input).runAsync(s), Duration.Inf)
 }
