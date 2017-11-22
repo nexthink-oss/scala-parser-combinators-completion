@@ -4,8 +4,7 @@ import cats.tests.CatsSuite
 import cats.kernel.laws.GroupLaws
 import org.json4s.JValue
 import org.scalacheck.Arbitrary._
-import org.scalacheck.Gen
-import org.scalacheck.Arbitrary
+import org.scalacheck.{Gen, Arbitrary}
 import org.scalacheck.ScalacheckShapeless._
 
 import scala.util.parsing.input.OffsetPosition

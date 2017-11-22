@@ -1,13 +1,13 @@
 package com.nexthink.utils.parsing.combinator.completion
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpec, Matchers}
+import monix.execution.Scheduler.Implicits.global
 
 import scala.util.parsing.combinator.Parsers
 
 class CompletionOperatorsTest extends FlatSpec with Matchers with Parsers with AsyncRegexCompletionSupport {
-  import monix.execution.Scheduler.Implicits.global
+
   val completions: Seq[Seq[Char]] = Seq("a", "b", "c")
   val score                       = 10
   val description                 = "some description"

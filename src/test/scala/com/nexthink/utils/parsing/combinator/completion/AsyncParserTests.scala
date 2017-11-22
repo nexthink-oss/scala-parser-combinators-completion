@@ -1,11 +1,9 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import com.nexthink.utils.parsing.combinator.completion.CompletionTestDefinitions.Tagged
-import com.nexthink.utils.parsing.combinator.completion.CompletionTestDefinitions.Default
+import com.nexthink.utils.parsing.combinator.completion.CompletionTestDefinitions.{Tagged, Default}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps

@@ -1,6 +1,7 @@
 package com.nexthink.utils.parsing.combinator.completion
 
 import org.scalatest.{FlatSpec,Matchers}
+import monix.execution.Scheduler.Implicits.global
 import CompletionTestDefinitions._
 
 class RecursiveGrammarTest extends FlatSpec with Matchers {
@@ -43,7 +44,6 @@ class RecursiveGrammarTest extends FlatSpec with Matchers {
 
   val expParser      = new ExprParser
   val asyncExpParser = new AsyncExprParser
-  import monix.execution.Scheduler.Implicits.global
 
   "A recursive arithmetic expression grammar:" should "parse expressions correctly" in {
     expressionsParseCorrectly((in) => expParser.parseAll(expParser.expr, in).get)
