@@ -76,7 +76,7 @@ pgpPublicRing := baseDirectory.value / "project" / ".gnupg" / "pubring.gpg"
 pgpSecretRing := baseDirectory.value / "project" / ".gnupg" / "secring.gpg"
 pgpPassphrase := sys.env.get("PGP_PASS").map(_.toArray)
 
-addCommandAlias("ci-all", ";+clean ;+compile ;+coverage ;+test ;+package ;+coverageReport ;+codacyCoverage")
+addCommandAlias("ci-all", ";+clean ;+compile ;+coverage ;+test ;+package ;+coverageReport; +coverageAggregate; +codacyCoverage")
 addCommandAlias("release", ";+publishSigned ;sonatypeRelease")
 
 scalacOptions += "-Ypartial-unification"
