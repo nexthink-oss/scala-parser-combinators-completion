@@ -1,6 +1,6 @@
 dist: trusty
 language: scala
-jdk: openjdk7
+jdk: oraclejdk8
 scala:
 - 2.12.4
 - 2.11.11
