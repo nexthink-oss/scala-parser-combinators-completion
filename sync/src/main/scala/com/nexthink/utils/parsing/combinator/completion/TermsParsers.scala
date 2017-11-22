@@ -1,7 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import com.nexthink.utils.parsing.collections.PrefixMap
-import com.nexthink.utils.parsing.collections.Trie
+import com.nexthink.utils.parsing.collections.{PrefixMap, Trie}
 import com.nexthink.utils.parsing.distance.DiceSorensenDistance.diceSorensenSimilarity
 import com.nexthink.utils.parsing.distance.{trigramsWithAffixing, tokenizeWords}
 import com.nexthink.utils.parsing.collections.SortingHelpers.lazyQuicksort

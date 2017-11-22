@@ -1,13 +1,10 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-
+import org.scalatest.{FlatSpec, Matchers}
+import monix.execution.Scheduler.Implicits.global
 import scala.util.parsing.combinator.Parsers
 
 class CompletionForAlternativesTest extends FlatSpec with Matchers {
-  import monix.execution.Scheduler.Implicits.global
-
   val left   = "left"
   val right  = "right"
   val common = "common"

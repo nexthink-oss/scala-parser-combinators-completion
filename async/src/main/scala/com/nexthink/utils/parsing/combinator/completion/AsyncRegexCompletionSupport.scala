@@ -7,9 +7,7 @@ import scala.collection.immutable.PagedSeq
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.matching.Regex
-import scala.util.parsing.input.Reader
-import scala.util.parsing.input.CharSequenceReader
-import scala.util.parsing.input.PagedSeqReader
+import scala.util.parsing.input.{Reader, CharSequenceReader, PagedSeqReader}
 
 trait AsyncRegexCompletionSupport extends RegexCompletionSupport with AsyncCompletionSupport {
 

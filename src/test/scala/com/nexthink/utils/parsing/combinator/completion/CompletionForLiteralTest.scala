@@ -1,8 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.scalatest.Matchers
-import org.scalatest.FlatSpec
-
+import org.scalatest.{Matchers, FlatSpec}
 import scala.util.parsing.combinator.Parsers
 
 class CompletionForLiteralTest extends FlatSpec with Matchers {

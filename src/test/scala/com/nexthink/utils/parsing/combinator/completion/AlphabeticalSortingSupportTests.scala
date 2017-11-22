@@ -2,8 +2,7 @@ package com.nexthink.utils.parsing.combinator.completion
 
 import java.util.Random
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpec, Matchers}
 
 class AlphabeticalSortingSupportTests extends FlatSpec with Matchers {
   object testParser extends AlphabeticalSortingSupport

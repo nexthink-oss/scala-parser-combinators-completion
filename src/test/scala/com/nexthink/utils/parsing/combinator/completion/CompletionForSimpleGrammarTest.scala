@@ -1,11 +1,10 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{Matchers, FlatSpec}
+import monix.execution.Scheduler.Implicits.global
+import CompletionTestDefinitions._
 
 class CompletionForSimpleGrammarTest extends FlatSpec with Matchers {
-  import CompletionTestDefinitions._
-  import monix.execution.Scheduler.Implicits.global
 
   object SimpleGrammar extends CompletionTestAsserters with RegexCompletionSupport {
     val number = "[0-9]+".r %> ("1", "10", "99") % "number" %? "any number"

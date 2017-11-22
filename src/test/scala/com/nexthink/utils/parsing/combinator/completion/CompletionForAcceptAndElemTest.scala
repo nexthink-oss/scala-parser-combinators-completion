@@ -1,8 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.junit.{Assert, Test}
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.parsing.combinator.syntactical.StandardTokenParsers
 

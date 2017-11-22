@@ -3,8 +3,7 @@ package com.nexthink.utils.parsing.combinator.completion
 import com.nexthink.utils.parsing.combinator.completion.CompletionTestDefinitions.Tagged
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.parsing.combinator.Parsers
 
