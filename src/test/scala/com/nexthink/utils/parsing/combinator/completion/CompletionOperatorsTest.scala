@@ -36,11 +36,11 @@ class CompletionOperatorsTest extends FlatSpec with Matchers with Parsers with A
       // Assert
       val completionSet: CompletionSet =
         tag.flatMap(n => result.setWithTag(n)).orElse(result.defaultSet).get
-      tag.getOrElse("") shouldBe completionSet.tag.label
-      score.getOrElse(0) shouldBe completionSet.tag.score
-      description shouldBe completionSet.tag.description
-      meta shouldBe completionSet.tag.meta
-      completions shouldBe completionSet.sortedEntries.map(_.value)
+      completionSet.tag.label shouldBe tag.getOrElse("")
+      completionSet.tag.score shouldBe score.getOrElse(0)
+      completionSet.tag.description shouldBe description
+      completionSet.tag.meta shouldBe meta
+      completionSet.sortedEntries.map(_.value) shouldBe completions
     }
     val p = parser %> CompletionSet(CompletionTag(tag, meta), completions.map(Completion(_)))
     assertCompletionsMatch(p % (tag, score) %? description %% meta)
@@ -51,13 +51,12 @@ class CompletionOperatorsTest extends FlatSpec with Matchers with Parsers with A
     assertCompletionsMatch(p % tag % score %? description %% meta)
   }
 
-  /*
   "Top completions" should "limit completions according to score" in {
-    topCompletionsLimitsCompletionsAccordingToScore(someParser)(complete)
-    topCompletionsLimitsCompletionsAccordingToScore(someAsyncParser)(complete)
+    topCompletionsLimitsCompletionsAccordingToScore(someParser)((p: Parser[String], s: String) => complete(p, s))
+    topCompletionsLimitsCompletionsAccordingToScore(someAsyncParser)((p: AsyncParser[String], s: String) => complete(p, s))
   }
 
-  def topCompletionsLimitsCompletionsAccordingToScore[T, P <: CombinableParser[T, P]](parser: P)(complete: (P, String) => Completions): Unit = {
+  def topCompletionsLimitsCompletionsAccordingToScore[T, P[+R] <: CombinableParser[R, P]](parser: P[T])(complete: (P[T], String) => Completions): Unit = {
     // Arrange
     val meta: JValue = ("some foo" -> "some bar")
     val completions = Seq("one", "two", "three", "four").zipWithIndex.map {
@@ -69,7 +68,7 @@ class CompletionOperatorsTest extends FlatSpec with Matchers with Parsers with A
     val result = complete(sut, "")
 
     // Assert
-    Seq("four", "three").toArray[AnyRef] === result.completionStrings.toArray[AnyRef]
-    Some(meta) === result.meta
-  }*/
+    Seq("four", "three").toArray[AnyRef] shouldBe result.completionStrings.toArray[AnyRef]
+    Some(meta) shouldBe  result.meta
+  }
 }

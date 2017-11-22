@@ -14,8 +14,8 @@ import scala.util.parsing.input.PagedSeqReader
 trait AsyncRegexCompletionSupport extends RegexCompletionSupport with AsyncCompletionSupport {
 
   /** Async explicits that simply wrap the corresponding parsers into direct eval tasks **/
-  implicit def asyncLiteral(s: String): AsyncParser[String] = ParserToAsync(super.literal(s))
-  implicit def asyncRegex(r: Regex): AsyncParser[String]    = ParserToAsync(super.regex(r))
+  implicit def asyncLiteral(s: String): AsyncParser[String] = parserToAsync(super.literal(s))
+  implicit def asyncRegex(r: Regex): AsyncParser[String]    = parserToAsync(super.regex(r))
 
   /** Parse some prefix of reader `in` with parser `p`. */
   def parseAsync[T](p: AsyncParser[T], in: Reader[Char]): Task[ParseResult[T]] =

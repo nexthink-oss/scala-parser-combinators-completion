@@ -20,7 +20,11 @@ trait AsyncCompletionSupport extends CompletionSupport {
   implicit def taskSemigroup[T](implicit ev: Semigroup[T]) = new Semigroup[Task[T]]() {
     override def combine(x: Task[T], y: Task[T]) = Task.mapBoth(x, y)(ev.combine)
   }
-  implicit def ParserToAsync[T](p: => Parser[T]): AsyncParser[T] = new AsyncParser[T] {
+
+  implicit class ConvertibleParser[T](p: => Parser[T]) {
+    def toAsync(): AsyncParser[T] = parserToAsync(p)
+  }
+  implicit def parserToAsync[T](p: => Parser[T]): AsyncParser[T] = new AsyncParser[T] {
     def apply(in: Input)       = Task.eval(p.apply(in))
     def completions(in: Input) = Task.eval(p.completions(in))
   }

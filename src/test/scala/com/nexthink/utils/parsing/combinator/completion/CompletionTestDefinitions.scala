@@ -1,11 +1,9 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.junit.Assert._
-
-import scala.util.parsing.combinator.Parsers
+import org.scalatest.Matchers
 
 object CompletionTestDefinitions {
-  trait AssertionSet {
+  trait AssertionSet extends Product with Serializable {
     def tag: String
   }
   case class Default(strings: String*) extends AssertionSet {
@@ -18,21 +16,21 @@ object CompletionTestDefinitions {
   }
 }
 
-trait CompletionTestAsserters extends CompletionTypes {
+trait CompletionTestAsserters extends CompletionTypes with Matchers {
   import CompletionTestDefinitions._
   def assertSetEquals(expected: AssertionSet, actual: CompletionSet): Unit =
     expected match {
-      case default @ Default(_ *) => {
+      case default @ Default(_*) => {
         default.strings.zip(actual.stringEntries).foreach {
-          case (e, a) => assertEquals(e, a)
+          case (e, a) => a shouldBe e
         }
       }
-      case named @ Tagged(name, desc, score, _ *) => {
-        assertEquals(name, actual.tag.label)
-        assertEquals(score, actual.tag.score)
-        assertEquals(desc, actual.tag.description)
+      case named @ Tagged(name, desc, score, _*) => {
+        actual.tag.label shouldBe name
+        actual.tag.score shouldBe score
+        actual.tag.description shouldBe desc
         named.strings.zip(actual.stringEntries).foreach {
-          case (e, a) => assertEquals(e, a)
+          case (e, a) => a shouldBe e
         }
       }
     }

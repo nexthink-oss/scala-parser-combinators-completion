@@ -1,10 +1,13 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.junit.{Assert, Test}
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
 
 import scala.util.parsing.combinator.RegexParsers
 
-class CompletionForChainTest {
+class CompletionForChainTest extends FlatSpec with Matchers {
+  import monix.execution.Scheduler.Implicits.global
+
   val repeated  = "rep"
   val separator = ","
   object TestParser extends RegexParsers with RegexCompletionSupport {
@@ -12,24 +15,32 @@ class CompletionForChainTest {
     val chainrParser =
       chainr1(literal(repeated), separator ^^ (_ => (a: String, b: String) => a), (a: String, b: String) => a, "")
   }
+  object AsyncTestParser extends RegexParsers with AsyncRegexCompletionSupport {
+    val chainlParser = asyncLiteral(repeated) * (separator ^^ (_ => (a: String, b: String) => a))
+    val chainrParser =
+      chainr1(asyncLiteral(repeated), separator ^^ (_ => (a: String, b: String) => a), (a: String, b: String) => a, "")
+  }
 
-  @Test
-  def repeaterCompletesToParserAndSeparatorAlternatively(): Unit = chainTest(TestParser.chainlParser)
+  "chainl" should "complete to parser and separator alternatively" in {
+    chainTest(in => TestParser.completeString(TestParser.chainlParser, in))
+    chainTest(in => AsyncTestParser.completeString(AsyncTestParser.chainlParser, in))
+  }
 
-  @Test
-  def chainr1CompletesToParserAndSeparatorAlternatively(): Unit =
-    chainTest(TestParser.chainrParser)
+  "chainr" should "complete to parser and separator alternatively" in {
+    chainTest(in => TestParser.completeString(TestParser.chainrParser, in))
+    chainTest(in => AsyncTestParser.completeString(AsyncTestParser.chainrParser, in))
+  }
 
-  private def chainTest[T](parser: TestParser.Parser[T]) = {
-    val resultRep  = TestParser.completeString(parser, "")
-    val resultSep  = TestParser.completeString(parser, repeated)
-    val resultRep2 = TestParser.completeString(parser, s"$repeated,")
-    val resultSep2 = TestParser.completeString(parser, s"$repeated,$repeated")
+  private def chainTest[T](complete: String => Seq[String]) = {
+    val resultRep  = complete("")
+    val resultSep  = complete(repeated)
+    val resultRep2 = complete(s"$repeated,")
+    val resultSep2 = complete(s"$repeated,$repeated")
 
     // Assert
-    Assert.assertEquals(resultRep.head, repeated)
-    Assert.assertEquals(resultSep.head, separator)
-    Assert.assertEquals(resultRep2.head, repeated)
-    Assert.assertEquals(resultSep2.head, separator)
+    resultRep.head shouldBe repeated
+    resultSep.head shouldBe separator
+    resultRep2.head shouldBe repeated
+    resultSep2.head shouldBe separator
   }
 }

@@ -2,9 +2,10 @@ package com.nexthink.utils.parsing.combinator.completion
 
 import java.util.Random
 
-import org.junit.{Assert, Test}
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
 
-class AlphabeticalSortingSupportTests {
+class AlphabeticalSortingSupportTests extends FlatSpec with Matchers {
   object testParser extends AlphabeticalSortingSupport
 
   private val rand       = new Random(75483758457L)
@@ -16,10 +17,10 @@ class AlphabeticalSortingSupportTests {
 
     val map = completions.completions.map { case (k, v) => (k.toString, v.score) }.toList.sortBy(_._2).reverse
 
-    Assert.assertEquals(expected, map)
+    map shouldBe expected
   }
 
-  @Test def fixed(): Unit = {
+  "fixed list" should "sort correctly" in {
     testList(
       fixedList,
       List(
@@ -42,7 +43,7 @@ class AlphabeticalSortingSupportTests {
     )
   }
 
-  @Test def random(): Unit = {
+  "random list" should "sort correctly" in {
     testList(
       randomList,
       List(

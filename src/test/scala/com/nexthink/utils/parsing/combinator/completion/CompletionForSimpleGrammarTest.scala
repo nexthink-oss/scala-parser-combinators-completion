@@ -1,9 +1,11 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.junit.Test
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
 
-class CompletionForSimpleGrammarTest {
+class CompletionForSimpleGrammarTest extends FlatSpec with Matchers {
   import CompletionTestDefinitions._
+  import monix.execution.Scheduler.Implicits.global
 
   object SimpleGrammar extends CompletionTestAsserters with RegexCompletionSupport {
     val number = "[0-9]+".r %> ("1", "10", "99") % "number" %? "any number"
@@ -14,50 +16,53 @@ class CompletionForSimpleGrammarTest {
     }
   }
 
-  @Test
-  def emptyCompletesToNumberOrParen(): Unit =
-    SimpleGrammar.assertHasCompletions(
-      Set(Tagged("number", Some("any number"), 0, "1", "10", "99"), Default("(")),
-      SimpleGrammar.complete(SimpleGrammar.expr, ""))
+  object AsyncSimpleGrammar extends CompletionTestAsserters with AsyncRegexCompletionSupport {
+    val number = "[0-9]+".r %> ("1", "10", "99") % "number" %? "any number"
 
-  @Test
-  def invalidCompletesToNothing(): Unit =
-    SimpleGrammar.assertHasCompletions(
-      Set(),
-      SimpleGrammar.complete(SimpleGrammar.expr, "invalid"))
+    def expr: AsyncParser[Int] = term | "(" ~> term <~ ")"
+    def term: AsyncParser[Int] = number ^^ {
+      _.toInt
+    }
+  }
 
+  def assertSyncCompletions(in: String, expected: Set[AssertionSet]) =
+    SimpleGrammar.assertHasCompletions(expected, SimpleGrammar.complete(SimpleGrammar.expr, in))
+  def assertAsyncCompletions(in: String, expected: Set[AssertionSet]) =
+    AsyncSimpleGrammar.assertHasCompletions(expected, AsyncSimpleGrammar.complete(AsyncSimpleGrammar.expr, in))
+  def assertCompletions(in: String, expected: Set[AssertionSet]): Unit = {
+    assertSyncCompletions(in, expected)
+    assertAsyncCompletions(in, expected)
+  }
 
-  @Test
-  def leftParenCompletesToNumber(): Unit =
-    SimpleGrammar.assertHasCompletions(
-      Set(Tagged("number", Some("any number"), 0, "1", "10", "99")),
-      SimpleGrammar.complete(SimpleGrammar.log(SimpleGrammar.expr)("expr"),
-                             "("))
+  "empty" should "complete to number or paren" in {
+    val expected = Set(Tagged("number", Some("any number"), 0, "1", "10", "99"), Default("("))
+    assertCompletions("", expected)
+  }
 
-  @Test
-  def leftParenAndNumberCompletesToRightParen(): Unit =
-    SimpleGrammar.assertHasCompletions(
-      Set(Default(")")),
-      SimpleGrammar.complete(SimpleGrammar.log(SimpleGrammar.expr)("expr"),
-        "(8"))
+  "invalid" should "complete to nothing" in {
+    assertCompletions("invalid", Set())
+  }
 
-  @Test
-  def leftParenAndInvalidCompletesToNothing(): Unit =
-    SimpleGrammar.assertHasCompletions(
-      Set(),
-      SimpleGrammar.complete(SimpleGrammar.log(SimpleGrammar.expr)("expr"),
-        "(invalid"))
+  "left paren" should "complete to number" in {
+    val expected: Set[AssertionSet] = Set(Tagged("number", Some("any number"), 0, "1", "10", "99"))
+    assertCompletions("(", expected)
+  }
 
-  @Test
-  def parenNumberCompletesToEmpty(): Unit =
-    SimpleGrammar.assertHasCompletions(
-      Set(),
-      SimpleGrammar.complete(SimpleGrammar.expr, "(56) "))
+  "left paren and number" should "complete to right parent" in {
+    val expected: Set[AssertionSet] = Set(Default(")"))
+    assertCompletions("(8", expected)
+  }
 
-  @Test
-  def numberCompletesToEmpty(): Unit =
-    SimpleGrammar.assertHasCompletions(
-      Set(),
-      SimpleGrammar.complete(SimpleGrammar.expr, "28 "))
+  "left paren and invalid" should "complete to nothing" in {
+    assertCompletions("(invalid", Set())
+  }
+
+  "parent number" should "complete to empty" in {
+    assertCompletions("(56) ", Set())
+  }
+
+  "number" should "complete to empty" in {
+    assertCompletions("(56) ", Set())
+  }
 
 }
