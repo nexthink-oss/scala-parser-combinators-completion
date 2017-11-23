@@ -21,7 +21,7 @@ class RecursiveGrammarTest extends FlatSpec with Matchers {
           case (prev, "/" ~ next) => prev / next
         }
     }
-    lazy val factor: Parser[Int] = number ^^ { _.toInt } | "(" ~> expr <~ ")"
+    lazy val factor: Parser[Int] = number ^^ { _.toInt } | "(" ~>! expr <~! ")"
   }
 
   class AsyncExprParser extends AsyncRegexCompletionSupport with CompletionTestAsserters {
@@ -39,7 +39,7 @@ class RecursiveGrammarTest extends FlatSpec with Matchers {
           case (prev, "/" ~ next) => prev / next
         }
     }
-    lazy val factor: AsyncParser[Int] = number ^^ { _.toInt } | "(" ~> expr <~ ")"
+    lazy val factor: AsyncParser[Int] = number ^^ { _.toInt } | "(" ~>! expr <~! ")"
   }
 
   val expParser      = new ExprParser

@@ -19,6 +19,7 @@ class CompletionForRepetitionTest extends FlatSpec with Matchers {
     val subSeqRight      = "as" ~ "df" | "df" ~ "as"
     val composedSequence = subSeqLeft ~ subSeqRight
     val repAlternatives  = rep1sep("foo" | composedSequence, "and")
+    val rep1Alternatives = rep1("foo" | composedSequence)
     val repNAlternatives = repN(5, "foo" | composedSequence)
   }
 
@@ -32,6 +33,7 @@ class CompletionForRepetitionTest extends FlatSpec with Matchers {
     val subSeqRight      = "as" ~ "df" | "df" ~ "as"
     val composedSequence = subSeqLeft ~ subSeqRight
     val repAlternatives  = rep1sep("foo" | composedSequence, "and")
+    val rep1Alternatives = rep1("foo" | composedSequence)
     val repNAlternatives = repN(5, "foo" | composedSequence)
   }
 
@@ -82,6 +84,10 @@ class CompletionForRepetitionTest extends FlatSpec with Matchers {
 
   "rep alternatives" should "complete to alternatives" in {
     parsersCompleteTo("foo and foo", Seq("and", "as", "bar", "df"), TestParser.repAlternatives, AsyncTestParser.repAlternatives)
+  }
+
+  "rep1 alternatives" should "complete to alternatives" in {
+    parsersCompleteTo("foo", Seq("as", "bar", "df", "foo"), TestParser.rep1Alternatives, AsyncTestParser.rep1Alternatives)
   }
 
   "repn alternatives" should "complete to alternatives" in {
