@@ -1,10 +1,7 @@
 package com.nexthink.utils.parsing.combinator.completion
 import org.json4s.JsonDSL._
 import org.json4s.JsonAST.JValue
-import org.junit.Assert._
-import org.junit.Test
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.parsing.input.OffsetPosition
 
@@ -51,7 +48,7 @@ class CompletionTypesTest extends FlatSpec with Matchers with CompletionTypes {
       .withMeta("context" -> Seq("contextB"))
 
     // Assert
-    assertArrayEquals(
+    merged.allSets shouldBe
       Seq(
         CompletionSet(
           CompletionTag("A", 10, "description").withMeta(("type" -> "a-type") ~ ("style" -> "highlight")),
@@ -63,10 +60,8 @@ class CompletionTypesTest extends FlatSpec with Matchers with CompletionTypes {
         ),
         setB,
         setC
-      ).toArray[AnyRef],
-      merged.allSets.toArray[AnyRef]
-    )
-    assertEquals(Some("context" -> Seq("contextA", "contextB"): JValue), merged.meta)
+      )
+    merged.meta shouldBe Some("context" -> Seq("contextA", "contextB"): JValue)
   }
 
   it should "pick completions at most advanced position" in {
@@ -76,8 +71,8 @@ class CompletionTypesTest extends FlatSpec with Matchers with CompletionTypes {
     val advancedPosition = OffsetPosition(foobar, 1)
 
     // Act
-    assertEquals((Completions(initialPosition, setA) | Completions(advancedPosition, setB)).allSets.head, setB)
-    assertEquals((Completions(advancedPosition, setA) | Completions(initialPosition, setB)).allSets.head, setA)
+    setB shouldBe (Completions(initialPosition, setA) | Completions(advancedPosition, setB)).allSets.head
+    setA shouldBe (Completions(advancedPosition, setA) | Completions(initialPosition, setB)).allSets.head
   }
 
 }

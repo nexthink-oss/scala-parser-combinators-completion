@@ -10,8 +10,6 @@ lazy val root = project
       "org.typelevel"              %% "cats-laws"                 % "1.0.0-MF" % Test,
       "org.typelevel"              %% "cats-testkit"              % "1.0.0-MF" % Test,
       "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6"    % Test,
-      "junit"                      % "junit"                      % "4.12"     % Test,
-      "com.novocode"               % "junit-interface"            % "0.11"     % Test,
       "org.scalacheck"             %% "scalacheck"                % "1.13.4"   % Test,
       "org.scalatest"              %% "scalatest"                 % "3.0.1"    % Test
     )
