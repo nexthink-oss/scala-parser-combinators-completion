@@ -45,7 +45,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     private def append[U >: T](p0: => AsyncParser[U]): AsyncParser[U] = {
       lazy val p = p0
       AsyncParser(
-        in => Task.mapBoth(this(in), p0(in))((x, y) => x append y), // TODO: how can I do this type-level style?
+        in => Task.mapBoth(this(in), p0(in))((x, y) => x append y),
         in => {
           val thisCompletions          = this.completions(in)
           lazy val combinedCompletions = thisCompletions |+| p.completions(in)

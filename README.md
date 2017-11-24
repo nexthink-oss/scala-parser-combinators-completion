@@ -21,7 +21,13 @@ A set of additional operators also allow overriding completions and specifying o
 Add the following lines to your `build.sbt` file:
  
  ```
- libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.0.9"
+ libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.1.0"
+ ```
+
+Asynchronous parsers (see below) are available in a separate package:
+
+ ```
+ libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion-async" % "1.1.0"
  ```
 
 ## Completing on a grammar
@@ -323,4 +329,22 @@ For fuzzy completion, terms are decomposed in their trigrams and stored in a map
 The top candidates according to `maxCompletionsCount` are returned as completions. 
 
 Note that terms are affixed so that the starting and ending two characters count more than the others, in order to favor completions which start or end with the same characters as the input.
+
+## Asynchronous parsers
+
+Asynchronous parsers allow for definition of grammars involving asynchronous terms, such as delegating parsing and/or completion to some database or online API. This is an option if the data necessary for parsing or providing relevant completions is not available in the same process as the parser, or accessible only remotely (online API). It can also be used with scalajs to provide e.g. search experiences running directly within the browser, without a dedicated back-end.
+
+Here's the definition of an asynchronous parser:
+
+```scala
+AsyncParser[T](af: Input => Task[ParseResult[T]], ac: Input => Task[Completions])
+```
+ 
+As you can see, we are wrapping the results of parsing and completions in a `Task[T]` effect, which is the one from [Monix](https://github.com/monix/monix). This entails that parsers are completely non-blocking and lazy, without implicit memoization, etc. Parsers defined in such a way support the same combinators as synchronous parsers, and can be combined with synchronous parsers transparently via the built-in implicit conversion to `Task.eval()`. 
+  
+Since asynchronous parsers have a dependency on [Monix](https://monix.io/) and [Cats](https://typelevel.org/cats/), they are available via a separate package, `scala-parser-combinators-completion-async` (see above for sbt line).  
+
+They can be used by mixing-in the trait `AsyncCompletionSupport`, or `AsyncRegexCompletionSupport` for string-based parsers.
+
+
   
