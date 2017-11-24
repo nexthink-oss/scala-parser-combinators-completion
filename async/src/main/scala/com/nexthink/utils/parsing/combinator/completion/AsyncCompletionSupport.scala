@@ -541,12 +541,23 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * being applied.
     */
   def log[T](p: => AsyncParser[T])(name: String): AsyncParser[T] =
-    AsyncParser(in => {
-      println("trying " + name + " at " + in)
-      val r = p(in)
-      println(name + " --> " + r)
-      r
-    }, p.completions)
+    AsyncParser(
+      in => {
+        println(s"trying $name at ${in.pos.longString}")
+        p(in).map(r => {
+          println(s"$name --> $r")
+          r
+        })
+      },
+      in => {
+        println("completing " + name + " at " + in.toString)
+        p.completions(in)
+          .map(r => {
+            println(s"$name --> $r")
+            r
+          })
+      }
+    )
 
   /** A parser generator for repetitions.
     *

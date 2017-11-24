@@ -19,8 +19,11 @@ class AsyncParserTests extends FlatSpec with Matchers {
   implicit val testScheduler = TestScheduler()
 
   "empty" should "complete to number or paren" in {
+    // Arrange
     var asserted = false
     val expected = Set(Tagged("number", Some("any number"), 0, "1", "10", "99"), Default("("))
+
+    // Act
     val asyncCompletion =
       AsyncGrammar
         .completeAsync(AsyncGrammar.term, "")
@@ -31,6 +34,34 @@ class AsyncParserTests extends FlatSpec with Matchers {
     // simulate passage of time
     testScheduler.tick(1 second)
 
+    // Assert
     asserted shouldBe true
+  }
+
+  "convertible parser" should "work" in {
+    // Arrange
+    object AsyncGrammar extends AsyncRegexCompletionSupport {
+      val sync: Parser[String] = literal("sync")
+      val async = sync.toAsync()
+    }
+
+    // Act
+    val result = AsyncGrammar.parse(AsyncGrammar.async, "sync")
+
+    // Assert
+    result.successful shouldBe true
+  }
+
+  "specify async completions" should "work" in {
+    // Arrange
+    object AsyncGrammar extends AsyncRegexCompletionSupport {
+      val p = "async" %> (in => "async".completions(in))
+    }
+
+    // Act
+    val result = AsyncGrammar.completeString(AsyncGrammar.p, "")
+
+    // Assert
+    result shouldBe Seq("async")
   }
 }

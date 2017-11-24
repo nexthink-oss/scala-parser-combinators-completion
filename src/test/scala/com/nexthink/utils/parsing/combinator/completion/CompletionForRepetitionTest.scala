@@ -46,6 +46,15 @@ class CompletionForRepetitionTest extends FlatSpec with Matchers {
     asyncParserCompletesTo(in, completions, asyncParser)
   }
 
+  def syncParserParses(in: String, parser: TestParser.Parser[_]): Any =
+    TestParser.parse(parser, in).successful shouldBe true
+  def asyncParserParses(in: String, parser: AsyncTestParser.AsyncParser[_]): Any =
+    AsyncTestParser.parse(parser, in).successful shouldBe true
+  def parsersParse(in: String, parser: TestParser.Parser[_], asyncParser: AsyncTestParser.AsyncParser[_]) = {
+    syncParserParses(in, parser)
+    asyncParserParses(in, asyncParser)
+  }
+
   "empty rep" should "complete to repeated" in {
     parsersCompleteTo("", Seq(repeated), TestParser.repSequence, AsyncTestParser.repSequence)
   }
@@ -94,4 +103,7 @@ class CompletionForRepetitionTest extends FlatSpec with Matchers {
     parsersCompleteTo("foo foo", Seq("as", "bar", "df", "foo"), TestParser.repNAlternatives, AsyncTestParser.repNAlternatives)
   }
 
+  "repn" should "parse" in {
+    parsersParse("repeated repeated repeated repeated repeated", TestParser.repNSequence, AsyncTestParser.repNSequence)
+  }
 }
