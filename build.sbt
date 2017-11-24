@@ -76,7 +76,7 @@ pgpPassphrase := sys.env.get("PGP_PASS").map(_.toArray)
 
 addCommandAlias(
   "ci-all",
-  ";clean ;compile ;coverage ;test ;package ;sync/coverageReport ;async/coverageReport ;coverageAggregate ;codacyCoverage;"
+  ";clean ;compile ;coverage ;test ;package ;sync/coverageReport ;async/coverageReport ;coverageAggregate ;codacyCoverage"
 )
 addCommandAlias("release", ";+publishSigned ;sonatypeRelease")
 
