@@ -1,6 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import com.nexthink.utils.collections.{PrefixMap, Trie}
+import com.nexthink.utils.parsing.collections.{PrefixMap, Trie}
 
 import scala.util.parsing.combinator.RegexParsers
 import scala.util.parsing.input.Reader

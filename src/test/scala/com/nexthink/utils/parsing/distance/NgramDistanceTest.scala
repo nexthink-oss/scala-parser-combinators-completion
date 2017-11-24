@@ -2,13 +2,10 @@ package com.nexthink.utils.parsing.distance
 
 import com.nexthink.utils.parsing.distance.NgramDistance._
 
-import org.junit.runner.RunWith
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
 
-@RunWith(classOf[JUnitRunner])
 class NgramDistanceTest extends PropSpec with PropertyChecks with Matchers {
 
   property("correct distances for concrete examples") {

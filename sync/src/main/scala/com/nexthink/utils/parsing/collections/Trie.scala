@@ -1,4 +1,4 @@
-package com.nexthink.utils.collections
+package com.nexthink.utils.parsing.collections
 
 import java.util
 

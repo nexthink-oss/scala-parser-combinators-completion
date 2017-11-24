@@ -1,31 +1,54 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.junit.Assert._
-import org.junit.Test
-
+import org.scalatest.{FlatSpec, Matchers}
+import monix.execution.Scheduler.Implicits.global
 import scala.util.parsing.combinator.RegexParsers
 
-class CompletionForIntoTest {
-  val animal = "animal"
+class CompletionForIntoTest extends FlatSpec with Matchers {
+  val animal  = "animal"
   val machine = "machine"
-  val bear = "bear"
-  val lion = "lion"
+  val bear    = "bear"
+  val lion    = "lion"
 
   object TestParser extends RegexParsers with RegexCompletionSupport {
     val animalParser  = bear | lion
     val machineParser = "plane" | "car"
-    val test          = (animal | machine) >> { meta: String => if (meta == animal) animalParser else machineParser }
+    val test = (animal | machine) >> { meta: String =>
+      if (meta == animal) animalParser else machineParser
+    }
   }
 
-  @Test
-  def intoParserWithoutSuccessCompletesToParser(): Unit = {
-    val completions = TestParser.completeString(TestParser.test, "")
-    assertEquals(Seq(animal, machine), completions)
+  object AsyncTestParser extends RegexParsers with AsyncRegexCompletionSupport {
+    val animalParser  = bear | lion
+    val machineParser = "plane" | "car"
+    val test = (animal | machine) >> { meta: String =>
+      if (meta == animal) animalParser else machineParser
+    }
   }
 
-  @Test
-  def intoParserWithSuccessCompletesResultingParser(): Unit = {
-    val completions = TestParser.completeString(TestParser.test, animal)
-    assertEquals(Seq(bear, lion), completions)
+  def syncParserCompletesTo(in: String, completions: Seq[String]) =
+    TestParser.completeString(TestParser.test, in) shouldBe completions
+  def asyncParserCompletesTo(in: String, completions: Seq[String]) =
+    AsyncTestParser.completeString(AsyncTestParser.test, in) shouldBe completions
+  def parsersCompleteTo(in: String, completions: Seq[String]) = {
+    syncParserCompletesTo(in, completions)
+    asyncParserCompletesTo(in, completions)
   }
+
+  "intoParser without success" should "complete to parser" in {
+    parsersCompleteTo("", Seq(animal, machine))
+  }
+
+  "async intoParser without success" should "complete to parser" in {
+    parsersCompleteTo("", Seq(animal, machine))
+  }
+
+  "intoParser with success" should "complete resulting parser" in {
+    parsersCompleteTo(animal, Seq(bear, lion))
+  }
+
+  "async intoParser with success" should "complete resulting parser" in {
+    parsersCompleteTo(animal, Seq(bear, lion))
+  }
+
 }

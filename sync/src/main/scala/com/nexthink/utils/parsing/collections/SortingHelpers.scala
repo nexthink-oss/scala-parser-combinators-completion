@@ -1,4 +1,4 @@
-package com.nexthink.utils.collections
+package com.nexthink.utils.parsing.collections
 
 object SortingHelpers {
   def lazyQuicksort[A](xs: Stream[A])(implicit o: Ordering[A]): Stream[A] = {

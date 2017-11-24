@@ -1,7 +1,7 @@
-package com.nexthink.utils.collections
+package com.nexthink.utils.parsing.collections
 
 /**
-  * Taken from http://www.scala-lang.org/docu/files/com.nexthink.utils.collections-api/com.nexthink.utils.collections-impl_6.html
+  * Taken from http://www.scala-lang.org/docu/files/com.nexthink.utils.parsing.collections-api/com.nexthink.utils.parsing.collections-impl_6.html
   * This is a trie implemented with immutable maps instead of arrays (immutable maps are compact with a small number of elements).
   * If size becomes a problem, we can consider using radix-trees for more compactness,
   * but having char-only nodes intuitively provides the most efficient read performance here since we are either interested

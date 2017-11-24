@@ -1,18 +1,16 @@
 package com.nexthink.utils.parsing.combinator.completion
 import org.json4s.JsonDSL._
-import org.json4s.native.JsonMethods.{compact, render}
 import org.json4s.JsonAST.JValue
-import org.junit.Assert._
-import org.junit.Test
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.parsing.input.OffsetPosition
 
-class CompletionTypesTest extends CompletionTypes {
+class CompletionTypesTest extends FlatSpec with Matchers with CompletionTypes {
   override type Elem = Char
 
   val setA = CompletionSet(
     CompletionTag("A", 10, "description").withMeta("type" -> "a-type"),
-    Set(Completion("a", 2, Some("meta1"-> "1")), Completion("b", 1).withMeta(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some"))))
+    Set(Completion("a", 2, Some("meta1" -> "1")), Completion("b", 1).withMeta(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some"))))
   )
 
   val setB = CompletionSet(CompletionTag("B", 5), Set(Completion("c", 4), Completion("d", 3)))
@@ -26,34 +24,31 @@ class CompletionTypesTest extends CompletionTypes {
     )
   )
 
-  @Test
-  def completionsTakeTopWorks(): Unit = {
+  "Completions" should "support takeTop()" in {
     // Arrange
     val compl = Completions(Seq(setA, setB, setC))
 
     // Act
     val lettersInOrder = Seq("a", "b", "c", "d", "e")
     val letterSets     = for (i <- 1 until lettersInOrder.length) yield lettersInOrder.take(i)
-    letterSets.foreach(set => assertEquals(set, compl.takeTop(set.length).completionStrings))
+    letterSets.foreach(set => set shouldBe compl.takeTop(set.length).completionStrings)
   }
 
-  @Test
-  def completionsSetsScoredWithMaxCompletionWorks(): Unit = {
+  it should "support setsScoredWithMaxCompletion()" in {
     // Arrange
     val compl = Completions(Seq(setA, setB, setC))
 
     // Act
-    assertEquals(Seq("e", "c", "d", "a", "b"), compl.setsScoredWithMaxCompletion().completionStrings)
+    Seq("e", "c", "d", "a", "b") shouldBe compl.setsScoredWithMaxCompletion().completionStrings
   }
 
-  @Test
-  def completionsAtSamePositionAreMerged(): Unit = {
+  it should "merge completions at same position" in {
     // Act
     val merged = Completions(Seq(setA, setB)).withMeta("context" -> Seq("contextA")) | Completions(Seq(setAPrime, setC))
       .withMeta("context" -> Seq("contextB"))
 
     // Assert
-    assertArrayEquals(
+    merged.allSets shouldBe
       Seq(
         CompletionSet(
           CompletionTag("A", 10, "description").withMeta(("type" -> "a-type") ~ ("style" -> "highlight")),
@@ -65,21 +60,19 @@ class CompletionTypesTest extends CompletionTypes {
         ),
         setB,
         setC
-      ).toArray[AnyRef],
-      merged.allSets.toArray[AnyRef]
-    )
-    assertEquals(Some("context" -> Seq("contextA", "contextB"): JValue), merged.meta)
+      )
+    merged.meta shouldBe Some("context" -> Seq("contextA", "contextB"): JValue)
   }
 
-  @Test
-  def completionsAtMostAdvancedPositionArePicked(): Unit = {
+  it should "pick completions at most advanced position" in {
     // Arrange
     val foobar           = "foobar"
     val initialPosition  = OffsetPosition(foobar, 0)
     val advancedPosition = OffsetPosition(foobar, 1)
 
     // Act
-    assertEquals((Completions(initialPosition, setA) | Completions(advancedPosition, setB)).allSets.head, setB)
-    assertEquals((Completions(advancedPosition, setA) | Completions(initialPosition, setB)).allSets.head, setA)
+    setB shouldBe (Completions(initialPosition, setA) | Completions(advancedPosition, setB)).allSets.head
+    setA shouldBe (Completions(advancedPosition, setA) | Completions(initialPosition, setB)).allSets.head
   }
+
 }

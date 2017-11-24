@@ -1,10 +1,10 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.junit.{Assert, Test}
-
+import org.scalatest.{Matchers, FlatSpec}
+import monix.execution.Scheduler.Implicits.global
 import scala.util.parsing.combinator.Parsers
 
-class CompletionForRepetitionTest {
+class CompletionForRepetitionTest extends FlatSpec with Matchers {
   val repeated  = "repeated"
   val separator = "separator"
   val n         = 5
@@ -19,58 +19,79 @@ class CompletionForRepetitionTest {
     val subSeqRight      = "as" ~ "df" | "df" ~ "as"
     val composedSequence = subSeqLeft ~ subSeqRight
     val repAlternatives  = rep1sep("foo" | composedSequence, "and")
+    val rep1Alternatives = rep1("foo" | composedSequence)
     val repNAlternatives = repN(5, "foo" | composedSequence)
   }
 
-  @Test
-  def emptyRepCompletesToRepeated(): Unit =
-    Assert.assertEquals(Seq(repeated), TestParser.completeString(TestParser.repSequence, ""))
+  object AsyncTestParser extends Parsers with AsyncRegexCompletionSupport {
+    val repSequence    = rep(repeated)
+    val repSepSequence = repsep(repeated, separator)
+    val error          = repsep(repeated, err("some error"))
+    val repNSequence   = repN(5, repeated)
 
-  @Test
-  def nInstancesAndPartialRepCompletesToRepeated(): Unit =
-    Assert.assertEquals(
-      Seq(repeated),
-      TestParser.completeString(TestParser.repSequence, List.fill(3)(repeated).mkString + repeated.dropRight(3)))
+    val subSeqLeft       = "foo" ~ "bar" | "foo"
+    val subSeqRight      = "as" ~ "df" | "df" ~ "as"
+    val composedSequence = subSeqLeft ~ subSeqRight
+    val repAlternatives  = rep1sep("foo" | composedSequence, "and")
+    val rep1Alternatives = rep1("foo" | composedSequence)
+    val repNAlternatives = repN(5, "foo" | composedSequence)
+  }
 
-  @Test
-  def nInstancesOfRepeatedRepNCompletesToRepeated(): Unit =
-    Assert.assertEquals(Seq(repeated),
-                        TestParser.completeString(TestParser.repNSequence, List.fill(3)(repeated).mkString))
+  def syncParserCompletesTo(in: String, completions: Seq[String], parser: TestParser.Parser[_]): Any =
+    TestParser.completeString(parser, in) shouldBe completions
+  def asyncParserCompletesTo(in: String, completions: Seq[String], parser: AsyncTestParser.AsyncParser[_]): Any =
+    AsyncTestParser.completeString(parser, in) shouldBe completions
+  def parsersCompleteTo(in: String, completions: Seq[String], parser: TestParser.Parser[_], asyncParser: AsyncTestParser.AsyncParser[_]) = {
+    syncParserCompletesTo(in, completions, parser)
+    asyncParserCompletesTo(in, completions, asyncParser)
+  }
 
-  @Test
-  def nInstancesPartialCompleteRepNCompletesToRepeated(): Unit =
-    Assert.assertEquals(
-      Seq(repeated),
-      TestParser.completeString(TestParser.repNSequence, List.fill(3)(repeated).mkString + repeated.dropRight(3)))
+  "empty rep" should "complete to repeated" in {
+    parsersCompleteTo("", Seq(repeated), TestParser.repSequence, AsyncTestParser.repSequence)
+  }
 
-  @Test
-  def nInstancesFollowedByErrorRepCompletesToNothing(): Unit =
-    Assert.assertEquals(Nil,
-                        TestParser.completeString(TestParser.repSequence, List.fill(3)(repeated).mkString + "error"))
+  "n instances and partial rep" should "complete to repeated" in {
+    parsersCompleteTo(List.fill(3)(repeated).mkString + repeated.dropRight(3), Seq(repeated), TestParser.repSequence, AsyncTestParser.repSequence)
+  }
 
-  @Test
-  def emptyRepSepCompletesToRepeated(): Unit =
-    Assert.assertEquals(Seq(repeated), TestParser.completeString(TestParser.repSepSequence, ""))
+  "n instances of repeated repn" should "complete to repeated" in {
+    parsersCompleteTo(List.fill(3)(repeated).mkString, Seq(repeated), TestParser.repNSequence, AsyncTestParser.repNSequence)
+  }
 
-  @Test
-  def repeatedAndSeparatorRepSepCompletesToRepeated(): Unit =
-    Assert.assertEquals(Seq(repeated), TestParser.completeString(TestParser.repSepSequence, repeated + separator))
+  "n instances of partial complete repn" should "complete to repeated" in {
+    parsersCompleteTo(List.fill(3)(repeated).mkString + repeated.dropRight(3), Seq(repeated), TestParser.repNSequence, AsyncTestParser.repNSequence)
+  }
 
-  @Test
-  def errorRepSepCompletesToNothing(): Unit =
-    Assert.assertEquals(Nil, TestParser.completeString(TestParser.error, repeated))
+  "n instances followed by error rep" should "complete to nothing" in {
+    parsersCompleteTo(List.fill(3)(repeated).mkString + "error", Nil, TestParser.repSequence, AsyncTestParser.repSequence)
+  }
 
-  @Test
-  def emptyRepNCompletesToRepeated(): Unit =
-    Assert.assertEquals(Seq(repeated), TestParser.completeString(TestParser.repNSequence, ""))
+  "repsep with empty" should "complete to repeated" in {
+    parsersCompleteTo("", Seq(repeated), TestParser.repSepSequence, AsyncTestParser.repSepSequence)
+  }
 
-  @Test
-  def repAlternativesCompletesToAlternatives(): Unit =
-    Assert.assertEquals(Seq("and", "as", "bar", "df"),
-                        TestParser.completeString(TestParser.repAlternatives, s"foo and foo"))
+  "repeated and separator repsep" should "complete to repeated" in {
+    parsersCompleteTo(repeated + separator, Seq(repeated), TestParser.repSepSequence, AsyncTestParser.repSepSequence)
+  }
 
-  @Test
-  def repNAlternativesCompletesToAlternatives(): Unit =
-    Assert.assertEquals(Seq("as", "bar", "df", "foo"),
-      TestParser.completeString(TestParser.repNAlternatives, s"foo foo"))
+  "error repsep" should "complete to nothing" in {
+    parsersCompleteTo(repeated, Nil, TestParser.error, AsyncTestParser.error)
+  }
+
+  "empty repn" should "complete to repeated" in {
+    parsersCompleteTo("", Seq(repeated), TestParser.repNSequence, AsyncTestParser.repNSequence)
+  }
+
+  "rep alternatives" should "complete to alternatives" in {
+    parsersCompleteTo("foo and foo", Seq("and", "as", "bar", "df"), TestParser.repAlternatives, AsyncTestParser.repAlternatives)
+  }
+
+  "rep1 alternatives" should "complete to alternatives" in {
+    parsersCompleteTo("foo", Seq("as", "bar", "df", "foo"), TestParser.rep1Alternatives, AsyncTestParser.rep1Alternatives)
+  }
+
+  "repn alternatives" should "complete to alternatives" in {
+    parsersCompleteTo("foo foo", Seq("as", "bar", "df", "foo"), TestParser.repNAlternatives, AsyncTestParser.repNAlternatives)
+  }
+
 }

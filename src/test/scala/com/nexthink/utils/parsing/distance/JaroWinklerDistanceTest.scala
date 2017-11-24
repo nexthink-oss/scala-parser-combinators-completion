@@ -2,14 +2,11 @@ package com.nexthink.utils.parsing.distance
 
 import com.nexthink.utils.parsing.distance.JaroWinklerDistance._
 
-import org.junit.runner.RunWith
 import org.scalacheck.Gen
 import org.scalactic.Equality
 import org.scalatest.{Matchers, PropSpec}
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
 
-@RunWith(classOf[JUnitRunner])
 class JaroWinklerDistanceTest extends PropSpec with PropertyChecks with Matchers {
 
   implicit val doubleEq = new Equality[Double] {

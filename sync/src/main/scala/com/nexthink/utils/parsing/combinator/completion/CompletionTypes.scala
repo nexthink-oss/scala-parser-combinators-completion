@@ -4,11 +4,12 @@ import org.json4s
 import org.json4s.{JArray, JValue}
 
 import scala.util.parsing.input.{NoPosition, Position}
-import com.nexthink.utils.collections.SortingHelpers.lazyQuicksort
+import com.nexthink.utils.parsing.collections.SortingHelpers.lazyQuicksort
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 
 import scala.collection.immutable
+import scala.language.implicitConversions
 
 /**  Collection of data types allowing definition of structured parser completions.
   *  A `Completions` instance can contain multiple `CompletionSet`s instances. A `CompletionSet` provides a set of
@@ -284,6 +285,7 @@ trait CompletionTypes {
       Completions(NoPosition, None, completionSets.map(s => s.tag.label -> s).toSeq)
 
     val empty = Completions(NoPosition, None, immutable.HashMap[String, CompletionSet]())
+
   }
 
 }

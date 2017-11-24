@@ -1,15 +1,14 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import org.junit.{Assert, Test}
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.parsing.combinator.syntactical.StandardTokenParsers
 
-class CompletionForAcceptAndElemTest {
+class CompletionForAcceptAndElemTest extends FlatSpec with Matchers {
   object TestParser extends StandardTokenParsers with CompletionSupport
   import TestParser.lexical._
 
-  @Test
-  def elemCompletesToPassedCompletions(): Unit = {
+  "elem" should "complete to passed completions" in {
     // Arrange
     val tokens = Set[Token](NumericLit("1"), NumericLit("2"), NumericLit("3"))
     val parser =
@@ -19,11 +18,10 @@ class CompletionForAcceptAndElemTest {
     val result = parser.completions(new Scanner(""))
 
     // Assert
-    Assert.assertArrayEquals(tokens.toArray[AnyRef], result.allCompletions.map(_.value.head).toArray[AnyRef])
+    result.allCompletions.map(_.value.head).toSet shouldBe tokens
   }
 
-  @Test
-  def acceptElemCompletesToElem(): Unit = {
+  "accept elem" should "complete to elem" in {
     // Arrange
     val elem   = NumericLit("1")
     val parser = TestParser.elem(elem)
@@ -32,11 +30,10 @@ class CompletionForAcceptAndElemTest {
     val result = parser.completions(new Scanner(""))
 
     // Assert
-    Assert.assertEquals(elem, headToken(result.allCompletions))
+    headToken(result.allCompletions) shouldBe elem
   }
 
-  @Test
-  def acceptElemListCompletesToNextInList(): Unit = {
+  "accept elem list" should "complete to next in list" in {
     // Arrange
     val one    = NumericLit("1")
     val two    = NumericLit("2")
@@ -51,14 +48,13 @@ class CompletionForAcceptAndElemTest {
     val emptyResult = parser.completions(new Scanner("1 2 3"))
 
     // Assert
-    Assert.assertEquals(one, headToken(result1.allCompletions))
-    Assert.assertEquals(two, headToken(result2.allCompletions))
-    Assert.assertEquals(three, headToken(result3.allCompletions))
-    Assert.assertTrue(emptyResult.allCompletions.isEmpty)
+    one shouldBe headToken(result1.allCompletions)
+    two shouldBe headToken(result2.allCompletions)
+    three shouldBe headToken(result3.allCompletions)
+    emptyResult.allCompletions.isEmpty shouldBe true
   }
 
-  @Test
-  def acceptWithPartialFunctionCompletesToPassedCompletions(): Unit = {
+  "accept with partial function" should "complete to passed completion" in {
     // Arrange
     case class Number(n: Int)
     val tokens = Set[Token](NumericLit("1"), NumericLit("2"), NumericLit("3"))
@@ -68,7 +64,7 @@ class CompletionForAcceptAndElemTest {
     val result = parser.completions(new Scanner(""))
 
     // Assert
-    Assert.assertArrayEquals(tokens.toArray[AnyRef], result.allCompletions.map(_.value.head).toArray[AnyRef])
+    result.allCompletions.map(_.value.head).toSet shouldBe tokens
   }
 
   private def headToken(completions: Iterable[TestParser.Completion]) = completions.map(_.value).head.head
