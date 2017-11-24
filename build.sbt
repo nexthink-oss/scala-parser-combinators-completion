@@ -36,7 +36,7 @@ lazy val async = project
 lazy val commonSettings = Seq(
   organization := "com.nexthink",
   licenses += ("BSD-3", url("https://opensource.org/licenses/bsd-3-clause")),
-  version := "1.1.0-SNAPSHOT",
+  version := "1.1.0",
   scalaVersion := "2.12.2",
   homepage := Some(url("https://github.com/nexthink/scala-parser-combinators-completion")),
   scmInfo := Some(
@@ -74,7 +74,7 @@ pgpPublicRing := baseDirectory.value / "project" / ".gnupg" / "pubring.gpg"
 pgpSecretRing := baseDirectory.value / "project" / ".gnupg" / "secring.gpg"
 pgpPassphrase := sys.env.get("PGP_PASS").map(_.toArray)
 
-addCommandAlias("ci-all", ";clean ;compile ;coverage ;test ;package ;sync/coverageReport ;async/coverageReport ;coverageAggregate ;coverageReport ;codacyCoverage")
+addCommandAlias("ci-all", ";clean ;compile ;coverage ;test ;package ;sync/coverageReport ;async/coverageReport ;coverageAggregate ;codacyCoverage")
 addCommandAlias("release", ";+publishSigned ;sonatypeRelease")
 
 scalacOptions += "-Ypartial-unification"
