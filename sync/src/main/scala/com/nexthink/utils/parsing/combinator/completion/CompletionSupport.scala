@@ -1035,13 +1035,13 @@ trait CompletionSupport extends Parsers with CompletionTypes {
   def log[T](p: => Parser[T])(name: String): Parser[T] =
     Parser(
       in => {
-        println(s"trying $name at ${in.pos.longString}")
+        println(s"trying $name at \n${in.pos.longString}")
         val r = p(in)
         println(s"$name --> $r")
         r
       },
       in => {
-        println(s"completing $name at ${in.pos.longString}")
+        println(s"completing $name at \n${in.pos.longString}")
         val r = p.completions(in)
         println(s"$name --> $r")
         r

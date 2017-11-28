@@ -21,13 +21,13 @@ A set of additional operators also allow overriding completions and specifying o
 Add the following lines to your `build.sbt` file:
  
  ```
- libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.1.0"
+ libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion" % "1.1.1"
  ```
 
 Asynchronous parsers (see below) are available in a separate package:
 
  ```
- libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion-async" % "1.1.0"
+ libraryDependencies += "com.nexthink" %% "scala-parser-combinators-completion-async" % "1.1.1"
  ```
 
 ## Completing on a grammar

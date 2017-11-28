@@ -543,14 +543,14 @@ trait AsyncCompletionSupport extends CompletionSupport {
   def log[T](p: => AsyncParser[T])(name: String): AsyncParser[T] =
     AsyncParser(
       in => {
-        println(s"trying $name at ${in.pos.longString}")
+        println(s"trying $name at \n${in.pos.longString}")
         p(in).map(r => {
           println(s"$name --> $r")
           r
         })
       },
       in => {
-        println("completing " + name + " at " + in.toString)
+        println(s"completing $name at \n${in.pos.longString}")
         p.completions(in)
           .map(r => {
             println(s"$name --> $r")
