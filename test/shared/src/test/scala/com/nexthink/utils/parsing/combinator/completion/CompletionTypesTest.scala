@@ -1,6 +1,4 @@
 package com.nexthink.utils.parsing.combinator.completion
-import org.json4s.JsonDSL._
-import org.json4s.JsonAST.JValue
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.parsing.input.OffsetPosition
@@ -10,7 +8,7 @@ class CompletionTypesTest extends FlatSpec with Matchers with CompletionTypes {
 
   val setA = CompletionSet(
     CompletionTag("A", 10, "description").withMeta("type" -> "a-type"),
-    Set(Completion("a", 2, Some("meta1" -> "1")), Completion("b", 1).withMeta(("objects" -> Seq("devices")) ~ ("themes" -> Seq("some"))))
+    Set(Completion("a", 2, Some("meta1" -> "1")), Completion("b", 1).withMeta("objects" -> Seq("devices"), "themes" -> Seq("some")))
   )
 
   val setB = CompletionSet(CompletionTag("B", 5), Set(Completion("c", 4), Completion("d", 3)))
@@ -19,7 +17,7 @@ class CompletionTypesTest extends FlatSpec with Matchers with CompletionTypes {
     CompletionTag("A", 10).withMeta("style" -> "highlight"),
     Set(
       Completion("a", 4, Some("meta2" -> "2")),
-      Completion("b", 1).withMeta(("objects" -> Seq("users", "packages")) ~ ("themes" -> Seq("other"))),
+      Completion("b", 1).withMeta("objects" -> Seq("users", "packages"), "themes" -> Seq("other")),
       Completion("aa")
     )
   )

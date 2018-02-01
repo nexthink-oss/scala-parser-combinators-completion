@@ -4,9 +4,9 @@ import java.util
 
 trait AlphabeticalSortingSupport extends RegexCompletionSupport {
 
-  def alphabeticallySortedCompletions(terms: Iterable[String], maxCompletionsCount: Int): CompletionSet = {
+  def alphabeticallySortedCompletions(terms: Iterable[String], maxCompletionsCount: Int): CompletionSet[Nothing, Nothing] = {
     if (maxCompletionsCount == 0) {
-      CompletionSet(Seq[Completion]())
+      CompletionSet.empty
     } else {
       val arr         = Array.ofDim[String](maxCompletionsCount)
       var currentSize = 0

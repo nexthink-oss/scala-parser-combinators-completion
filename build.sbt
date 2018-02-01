@@ -3,40 +3,52 @@ import sbt.Keys.version
 import sbt.Keys.licenses
 
 lazy val root = project
-  .in(file("."))
+  .settings(
+    commonSettings
+  )
+  .aggregate(syncJVM, syncJS, asyncJVM, asyncJS)
+  .dependsOn(testJVM, testJS)
+  .settings(
+    publish := {},
+    publishLocal := {}
+  )
+
+lazy val test = crossProject
+  .settings(commonSettings)
+  .dependsOn(sync, async)
+  .settings(
+    publish := {},
+    publishLocal := {}
+  )
+lazy val testJVM = test.jvm
+lazy val testJS  = test.js
+
+lazy val sync = crossProject
   .settings(
     commonSettings,
-    libraryDependencies ++= Seq(
-      "org.typelevel"              %% "cats-laws"                 % "1.0.0-MF" % Test,
-      "org.typelevel"              %% "cats-testkit"              % "1.0.0-MF" % Test,
-      "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6"    % Test,
-      "org.scalacheck"             %% "scalacheck"                % "1.13.4"   % Test,
-      "org.scalatest"              %% "scalatest"                 % "3.0.1"    % Test
-    )
+    name := "scala-parser-combinators-completion"
   )
-  .aggregate(sync, async)
-  .dependsOn(sync, async)
+lazy val syncJVM = sync.jvm
+lazy val syncJS  = sync.js.enablePlugins(ScalaJSPlugin)
 
-lazy val sync = project.settings(
-  commonSettings,
-  name := "scala-parser-combinators-completion"
-)
-lazy val async = project
+lazy val async = crossProject
   .dependsOn(sync)
   .settings(
     commonSettings,
     name := "scala-parser-combinators-completion-async",
     // cats & monix
     libraryDependencies ++= Seq(
-      "io.monix" %% "monix-eval" % "2.3.0",
-      "io.monix" %% "monix-cats" % "2.3.0"
+      "io.monix" %%% "monix-eval" % "2.3.0",
+      "io.monix" %%% "monix-cats" % "2.3.0"
     )
   )
+lazy val asyncJVM = async.jvm
+lazy val asyncJS  = async.js.enablePlugins(ScalaJSPlugin)
 
 lazy val commonSettings = Seq(
   organization := "com.nexthink",
   licenses += ("BSD-3", url("https://opensource.org/licenses/bsd-3-clause")),
-  version := "1.1.1",
+  version := "1.1.1-SNAPSHOT",
   scalaVersion := "2.12.2",
   homepage := Some(url("https://github.com/nexthink/scala-parser-combinators-completion")),
   scmInfo := Some(
@@ -62,8 +74,15 @@ lazy val commonSettings = Seq(
                              sys.env.getOrElse("SONATYPE_USER", ""),
                              sys.env.getOrElse("SONATYPE_PASSWORD", "")),
   libraryDependencies ++= Seq(
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
-    "org.json4s"             %% "json4s-native"            % "3.5.3"
+    "org.scala-lang.modules"     %%% "scala-parser-combinators" % "1.0.6",
+    "io.circe"                   %%% "circe-core" % "0.9.1",
+    "io.circe"                   %%% "circe-generic" % "0.9.1",
+    "io.circe"                   %%% "circe-parser" % "0.9.1",
+    "org.typelevel"              %%% "cats-laws" % "1.0.0-MF" % Test,
+    "org.typelevel"              %%% "cats-testkit" % "1.0.0-MF" % Test,
+    "com.github.alexarchambault" %%% "scalacheck-shapeless_1.13" % "1.1.6" % Test,
+    "org.scalacheck"             %%% "scalacheck" % "1.13.4" % Test,
+    "org.scalatest"              %%% "scalatest" % "3.0.4" % Test
   )
 )
 
