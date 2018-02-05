@@ -1,5 +1,9 @@
 package com.nexthink.utils.parsing.combinator.completion
 
+import cats.kernel.Semigroup
+import io.circe.Encoder
+import io.circe.generic.semiauto._
+
 import scala.util.matching.Regex
 import scala.util.parsing.combinator.RegexParsers
 import scala.util.parsing.input._
@@ -14,6 +18,7 @@ import scala.language.implicitConversions
   */
 trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
   protected val areLiteralsCaseSensitive = false
+  implicit val elemsEncoder: Encoder[Elems] = Encoder.encodeSeq(Encoder.encodeChar)
 
   protected def dropAnyWhiteSpace(input: Input): Input =
     input.drop(handleWhiteSpace(input.source, input.offset) - input.offset)
@@ -36,12 +41,12 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
     (literalPos, sourcePos)
   }
 
-  abstract override implicit def literal(s: String): Parser[String] =
-    Parser[String](
+  abstract override implicit def literal(s: String): Parser[String, Unit] =
+    Parser[String, Unit](
       super.literal(s),
       (in: Input) => {
         lazy val literalCompletion =
-          Completions(OffsetPosition(in.source, handleWhiteSpace(in)), CompletionSet(Completion(s)))
+          Completions(OffsetPosition(in.source, handleWhiteSpace(in)), CompletionSet(Completion[Unit](s)))
         val (literalOffset, sourceOffset) = findMatchOffsets(s, in)
         lazy val inputAtEnd               = sourceOffset == in.source.length
         literalOffset match {
@@ -54,24 +59,24 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
       }
     )
 
-  abstract override implicit def regex(r: Regex): Parser[String] =
+  abstract override implicit def regex(r: Regex): Parser[String, Unit] =
     Parser(super.regex(r), _ => Completions.empty)
 
-  override def positioned[T <: Positional](p: => Parser[T]): Parser[T] = {
+  override def positioned[T <: Positional, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] = {
     lazy val q = p
-    Parser[T](super.positioned(p), in => q.completions(in))
+    Parser[T, M](super.positioned(p), in => q.completions(in))
   }
 
   /** Returns completions for read `in` with parser `p`. */
-  def complete[T](p: Parser[T], in: Reader[Char]): Completions =
+  def complete[T, M](p: Parser[T, M], in: Reader[Char]): Completions[M] =
     p.completions(in)
 
   /** Returns completions for character sequence `in` with parser `p`. */
-  def complete[T](p: Parser[T], in: CharSequence): Completions =
+  def complete[T, M](p: Parser[T, M], in: CharSequence): Completions[M] =
     p.completions(new CharSequenceReader(in))
 
   /** Returns flattened string completions for character sequence `in` with parser `p`. */
-  def completeString[T](p: Parser[T], input: String): Seq[String] =
+  def completeString[T, M](p: Parser[T, M], input: String): Seq[String] =
     complete(p, input).completionStrings
 
 }

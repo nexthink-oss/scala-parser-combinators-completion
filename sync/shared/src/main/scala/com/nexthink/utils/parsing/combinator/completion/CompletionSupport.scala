@@ -1,5 +1,8 @@
 package com.nexthink.utils.parsing.combinator.completion
 
+import cats.kernel.Semigroup
+import io.circe.Encoder
+
 import scala.language.{higherKinds, implicitConversions}
 import scala.util.parsing.combinator.Parsers
 import scala.util.parsing.input.Positional
@@ -25,54 +28,59 @@ import scala.util.parsing.input.Positional
   *  @author Jonas Chapuis
   */
 trait CompletionSupport extends Parsers with CompletionTypes {
-  def Parser[T, M, TM, GM](f: Input => ParseResult[T], c: Input => Completions[M, TM, GM]): Parser[T, M, TM, GM] = new Parser[T, M, TM, GM] {
-    def apply(in: Input)       = f(in)
-    def completions(in: Input) = c(in)
+  implicit val unitSemi = new Semigroup[Unit] {
+    override def combine(x: Unit, y: Unit) = ()
   }
 
-  trait CombinableParser[+T, P[+R, PM, PTM, PGM] <: CombinableParser[R, P, M, TM, GM], M, TM, GM] {
+  def Parser[T, M](f: Input => ParseResult[T], c: Input => Completions[M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
+    new Parser[T, M] {
+      def apply(in: Input)       = f(in)
+      def completions(in: Input) = c(in)
+    }
+
+  trait CombinableParser[+T, P[+R, PM] <: CombinableParser[R, P, PM], M] {
 
     /** An operator to specify completions of a parser
       *
       * @param completions possible completions for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completions
       */
-    def %>(completions: Elems*): P[_, Nothing, Nothing, Nothing]
+    def %>(completions: Elems*): P[_, _]
 
     /** An operator to specify completion of a parser
       *
       * @param completion completion for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completion
       */
-    def %>(completion: Completion[M]): P[T, M, Nothing, Nothing]
+    def %>(completion: Completion[M]): P[T, M]
 
     /** An operator to specify completions of a parser
       *
       * @param completions possible completions for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completions
       */
-    def %>(completions: CompletionSet[M, TM]): P[T, M, TM, Nothing]
+    def %>(completions: CompletionSet[M]): P[T, M]
 
     /** Limits completions to the top `n` completions ordered by their score
       *
       * @param n the limit
       * @return wrapper `Parser` instance limiting the number of completions
       */
-    def topCompletions(n: Int): P[T, M, TM, GM]
+    def topCompletions(n: Int): P[T, M]
 
     /** An operator to specify the completion tag of a parser (empty tag by default)
       *
       * @param tag the completion tag (to be used e.g. to structure a completion menu)
       * @return wrapper `Parser` instance specifying the completion tag
       */
-    def %(tag: String): P[T, M, String, GM]
+    def %(tag: String): P[T, M]
 
     /** An operator to specify the completions tag score of a parser (0 by default)
       *
       * @param tagScore the completion tag score (to be used e.g. to order sections in a completion menu)
       * @return wrapper `Parser` instance specifying the completion tag score
       */
-    def %(tagScore: Int): P[T, M, TM, GM]
+    def %(tagScore: Int): P[T, M]
 
     /** An operator to specify the completion tag and score of a parser
       *
@@ -80,7 +88,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagScore the completion tag score
       * @return wrapper `Parser` instance specifying the completion tag
       */
-    def %(tag: String, tagScore: Int): P[T, M, String, GM]
+    def %(tag: String, tagScore: Int): P[T, M]
 
     /** An operator to specify the completion tag, score and description of a parser
       *
@@ -89,7 +97,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagDescription the completion tag description
       * @return wrapper `Parser` instance specifying completion tag
       */
-    def %(tag: String, tagScore: Int, tagDescription: String): P[T, M, String, GM]
+    def %(tag: String, tagScore: Int, tagDescription: String): P[T, M]
 
     /** An operator to specify the completion tag, score, description and meta of a parser
       *
@@ -99,21 +107,21 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagMeta        the completion tag meta
       * @return wrapper `Parser` instance specifying completion tag
       */
-    def %(tag: String, tagScore: Int, tagDescription: String, tagMeta: TM): P[T, M, TM, GM]
+    def %(tag: String, tagScore: Int, tagDescription: String, tagMeta: M): P[T, M]
 
     /** An operator to specify the completion tag
       *
       * @param tag the completion tag
       * @return wrapper `Parser` instance specifying completion tag
       */
-    def %(tag: CompletionTag[TM]): P[T, M, TM, GM]
+    def %(tag: CompletionTag[M]): P[T, M]
 
     /** An operator to specify the completion tag description of a parser (empty by default)
       *
       * @param tagDescription the completion description (to be used e.g. to add information to a completion entry)
       * @return wrapper `Parser` instance specifying the completion description
       */
-    def %?(tagDescription: String): P[T, M, TM, GM]
+    def %?(tagDescription: String): P[T, M]
 
     /** An operator to specify the completion tag meta-data of a parser (empty by default).
       * Note that an implicit merge function must be provided for the meta-data, to be applied when combining two equivalent tags (i.e. bearing the same label, but with a different payload).
@@ -123,7 +131,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagMeta the JValue for completion tag meta-data (to be used e.g. to specify the visual style for a completion tag in the menu)
       * @return wrapper `Parser` instance specifying the completion tag meta-data
       */
-    def %%[NTM](tagMeta: NTM): P[T, M, NTM, GM]
+    def %%(tagMeta: M): P[T, M]
 
     /** An operator to specify the meta-data for completions of a parser (empty by default).
       * Note that an implicit merge function must be provided for the meta-data, used when combining two completion entries.
@@ -131,7 +139,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param meta the completion meta-data (to be used e.g. to specify the visual style for a completion entry in the menu)
       * @return wrapper `Parser` instance specifying the completion meta-data
       */
-    def %-%[NM](meta: NM): P[T, NM, TM, GM]
+    def %-%(meta: M): P[T, M]
 
     /**
       * An operator to specify the meta-data for the whole set of completions (empty by default)
@@ -142,19 +150,19 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param globalMeta the JValue for completions meta-data (to be used e.g. to specify the visual style for the completion menu)
       * @return wrapper `Parser` instance specifying the completions meta-data
       */
-    def %%%[NGM](globalMeta: NGM): P[T, M, TM, NGM]
+    def %%%(globalMeta: M): P[T, M]
 
-    def flatMap[U](f: T => P[U, M, TM, GM]): P[U, M, TM, GM]
+    def flatMap[U](f: T => P[U, M]): P[U, M]
 
-    def map[U](f: T => U): P[U, M, TM, GM]
+    def map[U](f: T => U): P[U, M]
 
-    def map[U, NM, NTM, NGM](f: T => U, fc: Completions[M, TM, GM] => Completions[NM, NTM, NGM]): P[U, NM, NTM, NGM]
+    def map[U, N](f: T => U, fc: Completions[M] => Completions[N])(implicit semigroup: Semigroup[N], encoder: Encoder[N]): P[U, N]
 
-    def mapCompletions[NM, NTM, NGM](fc: Completions[M, TM, GM] => Completions[NM, NTM, NGM]): P[T, NM, NTM, NGM]
+    def mapCompletions[N](fc: Completions[M] => Completions[N])(implicit semigroup: Semigroup[N], encoder: Encoder[N]): P[T, N]
 
-    def filter(p: T => Boolean): P[T, M, TM, GM]
+    def filter(p: T => Boolean): P[T, M]
 
-    def withFilter(p: T => Boolean): P[T, M, TM, GM]
+    def withFilter(p: T => Boolean): P[T, M]
 
     /** A parser combinator for sequential composition.
       *
@@ -166,7 +174,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *         but easier to pattern match on) that contains the result of `p` and
       *         that of `q`. The resulting parser fails if either `p` or `q` fails.
       */
-    def ~[U](q: => P[U, M, TM, GM]): P[~[T, U], M, TM, GM]
+    def ~[U](q: => P[U, M]): P[~[T, U], M]
 
     /** A parser combinator for sequential composition which keeps only the right result.
       *
@@ -176,7 +184,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *          succeeds -- evaluated at most once, and only when necessary.
       * @return a `Parser` that -- on success -- returns the result of `q`.
       */
-    def ~>[U](q: => P[U, M, TM, GM]): P[U, M, TM, GM]
+    def ~>[U](q: => P[U, M]): P[U, M]
 
     /** A parser combinator for sequential composition which keeps only the left result.
       *
@@ -187,7 +195,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param q a parser that will be executed after `p` (this parser) succeeds -- evaluated at most once, and only when necessary
       * @return a `Parser` that -- on success -- returns the result of `p`.
       */
-    def <~[U](q: => P[U, M, TM, GM]): P[T, M, TM, GM]
+    def <~[U](q: => P[U, M]): P[T, M]
 
     /** A parser combinator for non-back-tracking sequential composition.
       *
@@ -199,7 +207,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *         that contains the result of `p` and that of `q`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    def ~![U](q: => P[U, M, TM, GM]): P[~[T, U], M, TM, GM]
+    def ~![U](q: => P[U, M]): P[~[T, U], M]
 
     /** A parser combinator for non-back-tracking sequential composition which only keeps the right result.
       *
@@ -210,7 +218,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a `Parser` that -- on success -- reutrns the result of `q`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    def ~>![U](q: => P[U, M, TM, GM]): P[U, M, TM, GM]
+    def ~>![U](q: => P[U, M]): P[U, M]
 
     /** A parser combinator for non-back-tracking sequential composition which only keeps the left result.
       *
@@ -221,7 +229,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a `Parser` that -- on success -- reutrns the result of `p`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    def <~![U](q: => P[U, M, TM, GM]): P[T, M, TM, GM]
+    def <~![U](q: => P[U, M]): P[T, M]
 
     /** A parser combinator for alternative composition.
       *
@@ -234,7 +242,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *         - `p` succeeds, ''or''
       *         - if `p` fails allowing back-tracking and `q` succeeds.
       */
-    def |[U >: T](q: => P[U, M, TM, GM]): P[U, M, TM, GM]
+    def |[U >: T](q: => P[U, M]): P[U, M]
 
     /** A parser combinator for alternative with longest match composition.
       *
@@ -244,7 +252,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param q a parser that accepts if p consumes less characters. -- evaluated at most once, and only when necessary
       * @return a `Parser` that returns the result of the parser consuming the most characters (out of `p` and `q`).
       */
-    def |||[U >: T](q: => P[U, M, TM, GM]): P[U, M, TM, GM]
+    def |||[U >: T](q: => P[U, M]): P[U, M]
 
     /** A parser combinator for function application.
       *
@@ -254,7 +262,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a parser that has the same behaviour as the current parser, but whose result is
       *         transformed by `f`.
       */
-    def ^^[U](f: T => U): P[U, M, TM, GM]
+    def ^^[U](f: T => U): P[U, M]
 
     /** A parser combinator that changes a successful result into the specified value.
       *
@@ -263,7 +271,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param v The new result for the parser, evaluated at most once (if `p` succeeds), not evaluated at all if `p` fails.
       * @return a parser that has the same behaviour as the current parser, but whose successful result is `v`
       */
-    def ^^^[U](v: => U): P[U, M, TM, GM]
+    def ^^^[U](v: => U): P[U, M]
 
     /** A parser combinator for partial function application.
       *
@@ -278,7 +286,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a parser that succeeds if the current parser succeeds <i>and</i> `f` is applicable
       *         to the result. If so, the result will be transformed by `f`.
       */
-    def ^?[U](f: PartialFunction[T, U], error: T => String): P[U, M, TM, GM]
+    def ^?[U](f: PartialFunction[T, U], error: T => String): P[U, M]
 
     /** A parser combinator for partial function application.
       *
@@ -290,7 +298,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a parser that succeeds if the current parser succeeds <i>and</i> `f` is applicable
       *         to the result. If so, the result will be transformed by `f`.
       */
-    def ^?[U](f: PartialFunction[T, U]): P[U, M, TM, GM]
+    def ^?[U](f: PartialFunction[T, U]): P[U, M]
 
     /** A parser combinator that parameterizes a subsequent parser with the
       * result of this one.
@@ -313,16 +321,16 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *  @return a parser that succeeds if this parser succeeds (with result `x`)
       *          and if then `fq(x)` succeeds
       */
-    def into[U](fq: T => P[U, M, TM, GM]): P[U, M, TM, GM]
+    def into[U](fq: T => P[U, M]): P[U, M]
 
     /** Returns `into(fq)`. */
-    def >>[U](fq: T => P[U, M, TM, GM]): P[U, M, TM, GM]
+    def >>[U](fq: T => P[U, M]): P[U, M]
 
     /** Returns a parser that repeatedly parses what this parser parses.
       *
       *  @return rep(this)
       */
-    def *(): P[List[T], M, TM, GM]
+    def *(): P[List[T], M]
 
     /** Returns a parser that repeatedly parses what this parser parses,
       * interleaved with the `sep` parser. The `sep` parser specifies how
@@ -330,19 +338,19 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *
       * @return chainl1(this, sep)
       */
-    def *[U >: T](sep: => P[(U, U) => U, M, TM, GM]): P[U, M, TM, GM]
+    def *[U >: T](sep: => P[(U, U) => U, M]): P[U, M]
 
     /** Returns a parser that repeatedly (at least once) parses what this parser parses.
       *
       * @return rep1(this)
       */
-    def +(): P[List[T], M, TM, GM]
+    def +(): P[List[T], M]
 
     /** Returns a parser that optionally parses what this parser parses.
       *
       * @return opt(this)
       */
-    def ?(): P[Option[T], M, TM, GM]
+    def ?(): P[Option[T], M]
 
     /** Changes the failure message produced by a parser.
       *
@@ -367,7 +375,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return
       *A parser with the same properties and different failure message.
       */
-    def withFailureMessage(msg: String): P[T, M, TM, GM]
+    def withFailureMessage(msg: String): P[T, M]
 
     /** Changes the failure message produced by a parser.
       *
@@ -396,16 +404,16 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param msg The message that will replace the default failure message.
       *@return A parser with the same properties and different failure message.
       */
-    def withErrorMessage(msg: String): P[T, M, TM, GM]
+    def withErrorMessage(msg: String): P[T, M]
   }
 
   /** The root class of completion parsers, overloading the `Parser` class.
     * Completion parsers are functions from the Input type to ParseResult, with the
     * addition of a `completions` function from the Input type to an instance of `Completions`
     */
-  abstract class Parser[+T, M, TM, GM] extends super.Parser[T] with CombinableParser[T, Parser, M, TM, GM] {
+  abstract class Parser[+T, M](implicit semigroup: Semigroup[M], encoder: Encoder[M]) extends super.Parser[T] with CombinableParser[T, Parser, M] {
 
-    def append[U >: T](p0: => Parser[U, M, TM, GM]): Parser[U, M, TM, GM] = {
+    def append[U >: T](p0: => Parser[U, M]): Parser[U, M] = {
       lazy val p = p0
       Parser(
         in => super.append(p)(in),
@@ -415,7 +423,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
           this(in) match {
             case Success(_, rest) =>
               // only return any completions if they start at the last position, otherwise it can behave badly e.g. with fuzzy matching
-              if (combinedCompletions.position < rest.pos) Completions.empty
+              if (combinedCompletions.position < rest.pos) Completions.empty[M]
               else combinedCompletions
             case Failure(_, _) => combinedCompletions
             case Error(_, _) =>
@@ -430,26 +438,26 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param in the input
       * @return an instance of [[com.nexthink.utils.parsing.combinator.completion.CompletionTypes.Completions]]
       */
-    def completions(in: Input): Completions[M, TM, GM]
+    def completions(in: Input): Completions[M]
 
     /** An operator to specify completions of a parser
       * @param completions possible completions for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completions
       */
-    override def %>(completions: Elems*): Parser[T, Nothing, Nothing, Nothing] =
-      %>(CompletionSet(completions.map(el => Completion(el))))
+    override def %>(completions: Elems*): Parser[T, M] =
+      %>(CompletionSet(completions.map(el => Completion[M](el))))
 
     /** An operator to specify completion of a parser
       * @param completion completion for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completion
       */
-    override def %>(completion: Completion[M]): Parser[T, M, Nothing, Nothing]  = %>(CompletionSet(completion))
+    override def %>(completion: Completion[M]): Parser[T, M] = %>(CompletionSet(completion))
 
     /** An operator to specify completions of a parser
       * @param completions possible completions for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completions
       */
-    override def %>(completions: CompletionSet[M, TM]): Parser[T, M, TM, Nothing]  =
+    override def %>(completions: CompletionSet[M]): Parser[T, M] =
       Parser(this,
              in =>
                this(in) match {
@@ -462,14 +470,14 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param completioner function of input to completions
       * @return a `Parser` that upon invocation of the `completions` method will invoke the passed function
       */
-    def %>(completioner: Input => Completions[M, TM, GM]): Parser[T, M, TM, GM] =
+    def %>(completioner: Input => Completions[M]): Parser[T, M] =
       Parser(this, completioner)
 
     /** Limits completions to the top `n` completions ordered by their score
       * @param n the limit
       * @return wrapper `Parser` instance limiting the number of completions
       */
-    override def topCompletions(n: Int): Parser[T, M, TM, GM] =
+    override def topCompletions(n: Int): Parser[T, M] =
       Parser(
         this,
         in => this.completions(in).takeTop(n)
@@ -479,14 +487,14 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tag the completion tag (to be used e.g. to structure a completion menu)
       * @return wrapper `Parser` instance specifying the completion tag
       */
-    override def %(tag: String): Parser[T, M, TM, GM] =
+    override def %(tag: String): Parser[T, M] =
       Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag)))
 
     /** An operator to specify the completions tag score of a parser (0 by default)
       * @param tagScore the completion tag score (to be used e.g. to order sections in a completion menu)
       * @return wrapper `Parser` instance specifying the completion tag score
       */
-    override def %(tagScore: Int): Parser[T, M, TM, GM] =
+    override def %(tagScore: Int): Parser[T, M] =
       Parser(this, in => updateCompletionsTag(this.completions(in), None, Some(tagScore)))
 
     /** An operator to specify the completion tag and score of a parser
@@ -494,7 +502,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagScore the completion tag score
       * @return wrapper `Parser` instance specifying the completion tag
       */
-    override def %(tag: String, tagScore: Int): Parser[T, M, TM, GM] =
+    override def %(tag: String, tagScore: Int): Parser[T, M] =
       Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore)))
 
     /** An operator to specify the completion tag, score and description of a parser
@@ -503,7 +511,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagDescription the completion tag description
       * @return wrapper `Parser` instance specifying completion tag
       */
-    override def %(tag: String, tagScore: Int, tagDescription: String): Parser[T, M, TM, GM]=
+    override def %(tag: String, tagScore: Int, tagDescription: String): Parser[T, M] =
       Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore), Some(tagDescription)))
 
     /** An operator to specify the completion tag, score, description and meta of a parser
@@ -513,21 +521,21 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagMeta the completion tag meta
       * @return wrapper `Parser` instance specifying completion tag
       */
-    override def %(tag: String, tagScore: Int, tagDescription: String, tagMeta: TM): Parser[T, M, TM, GM] =
+    override def %(tag: String, tagScore: Int, tagDescription: String, tagMeta: M): Parser[T, M] =
       Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag), Some(tagScore), Some(tagDescription), Some(tagMeta)))
 
     /** An operator to specify the completion tag
       * @param tag the completion tag
       * @return wrapper `Parser` instance specifying completion tag
       */
-    override def %(tag: CompletionTag[TM]): Parser[T, M, TM, GM] =
+    override def %(tag: CompletionTag[M]): Parser[T, M] =
       Parser(this, in => updateCompletionsTag(this.completions(in), Some(tag.label), Some(tag.score), tag.description, tag.meta))
 
     /** An operator to specify the completion tag description of a parser (empty by default)
       * @param tagDescription the completion description (to be used e.g. to add information to a completion entry)
       * @return wrapper `Parser` instance specifying the completion description
       */
-    override def %?(tagDescription: String): Parser[T, M, TM, GM] =
+    override def %?(tagDescription: String): Parser[T, M] =
       Parser(this, in => updateCompletionsTag(this.completions(in), None, None, Some(tagDescription)))
 
     /** An operator to specify the completion tag meta-data of a parser in JSON format (empty by default).
@@ -537,7 +545,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param tagMeta the JValue for completion tag meta-data (to be used e.g. to specify the visual style for a completion tag in the menu)
       * @return wrapper `Parser` instance specifying the completion tag meta-data
       */
-    def %%(tagMeta: TM): Parser[T, M, TM, GM] =
+    def %%(tagMeta: M): Parser[T, M] =
       Parser(this, in => this.completions(in).map(set => CompletionSet(set.tag.withMeta(tagMeta), set.completions)))
 
     /** An operator to specify the meta-data for completions of a parser (empty by default).
@@ -545,7 +553,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param meta the completion meta-data (to be used e.g. to specify the visual style for a completion entry in the menu)
       * @return wrapper `Parser` instance specifying the completion meta-data
       */
-    def %-%(meta: M): Parser[T, M, TM, GM] =
+    def %-%(meta: M): Parser[T, M] =
       Parser(this, in => this.completions(in).map(set => CompletionSet(set.tag, set.entries.map(e => e.withMeta(meta)))))
 
     /**
@@ -556,27 +564,27 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param globalMeta the JValue for completions meta-data (to be used e.g. to specify the visual style for the completion menu)
       * @return wrapper `Parser` instance specifying the completions meta-data
       */
-    def %%%(globalMeta: GM): Parser[T, M, TM, GM] =
+    def %%%(globalMeta: M): Parser[T, M] =
       Parser(this, in => this.completions(in).withMeta(globalMeta))
 
-    override def flatMap[U](f: T => Parser[U, M, TM, GM]): Parser[U, M, TM, GM] =
+    override def flatMap[U](f: T => Parser[U, M]): Parser[U, M] =
       Parser(super[Parser].flatMap(f), completions)
 
-    override def map[U](f: T => U): Parser[U, M, TM, GM] =
+    override def map[U](f: T => U): Parser[U, M] =
       Parser(super[Parser].map(f), completions)
 
-    override def map[U, NM, NTM, NGM](f: T => U, fc: Completions[M, TM, GM] => Completions[NM, NTM, NGM]): Parser[U, NM, NTM, NGM] =
+    override def map[U, N](f: T => U, fc: Completions[M] => Completions[N])(implicit semigroup: Semigroup[N], encoder: Encoder[N]): Parser[U, N] =
       map(f).mapCompletions(fc)
 
-    override def mapCompletions[NM, NTM, NGM](fc: Completions[M, TM, GM] => Completions[NM, NTM, NGM]): Parser[T, NM, NTM, NGM] =
+    override def mapCompletions[N](fc: Completions[M] => Completions[N])(implicit semigroup: Semigroup[N], encoder: Encoder[N]): Parser[T, N] =
       Parser(this, in => fc(this.completions(in)))
 
-    override def filter(p: T => Boolean): Parser[T, M, TM, GM] = withFilter(p)
+    override def filter(p: T => Boolean): Parser[T, M] = withFilter(p)
 
-    override def withFilter(p: T => Boolean): Parser[T, M, TM, GM] =
+    override def withFilter(p: T => Boolean): Parser[T, M] =
       Parser(super[Parser].withFilter(p), completions)
 
-    private def seqCompletions[U](in: Input, other: => Parser[U, M, TM, GM]): Completions[M, TM, GM] = {
+    private def seqCompletions[U](in: Input, other: => Parser[U, M]): Completions[M] = {
       lazy val thisCompletions = this.completions(in)
       this(in) match {
         case Success(_, rest) =>
@@ -596,7 +604,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *         but easier to pattern match on) that contains the result of `p` and
       *         that of `q`. The resulting parser fails if either `p` or `q` fails.
       */
-    override def ~[U](q: => Parser[U, M, TM, GM]): Parser[~[T, U], M, TM, GM] = {
+    override def ~[U](q: => Parser[U, M]): Parser[~[T, U], M] = {
       lazy val p = q
       Parser(super[Parser].~(q), in => seqCompletions(in, p))
     }.named("~")
@@ -609,7 +617,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *        succeeds -- evaluated at most once, and only when necessary.
       * @return a `Parser` that -- on success -- returns the result of `q`.
       */
-    override def ~>[U](q: => Parser[U, M, TM, GM]): Parser[U, M, TM, GM] = {
+    override def ~>[U](q: => Parser[U, M]): Parser[U, M] = {
       lazy val p = q
       Parser(super[Parser].~>(q), in => seqCompletions(in, p))
     }.named("~>")
@@ -624,7 +632,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param q a parser that will be executed after `p` (this parser) succeeds -- evaluated at most once, and only when necessary
       * @return a `Parser` that -- on success -- returns the result of `p`.
       */
-    override def <~[U](q: => Parser[U, M, TM, GM]): Parser[T, M, TM, GM] = {
+    override def <~[U](q: => Parser[U, M]): Parser[T, M] = {
       lazy val p = q
       Parser(super[Parser].<~(q), in => seqCompletions(in, p))
     }.named("<~")
@@ -639,7 +647,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *         that contains the result of `p` and that of `q`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    override def ~![U](q: => Parser[U, M, TM, GM]): Parser[~[T, U], M, TM, GM] = {
+    override def ~![U](q: => Parser[U, M]): Parser[~[T, U], M] = {
       lazy val p = q
       Parser(super[Parser].~!(q), in => seqCompletions(in, p))
     }.named("~!")
@@ -653,9 +661,9 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a `Parser` that -- on success -- reutrns the result of `q`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    override def ~>![U](q: => Parser[U, M, TM, GM]): Parser[U, M, TM, GM] = {
-      lazy val p            = q
-      val parser: Parser[U, M, TM, GM] = for (a <- this; b <- commit(p)) yield b
+    override def ~>![U](q: => Parser[U, M]): Parser[U, M] = {
+      lazy val p               = q
+      val parser: Parser[U, M] = for (a <- this; b <- commit(p)) yield b
       Parser(OnceParser(parser.apply), in => seqCompletions(in, p))
     }.named("~>!")
 
@@ -668,9 +676,9 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a `Parser` that -- on success -- reutrns the result of `p`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    override def <~![U](q: => Parser[U, M, TM, GM]): Parser[T, M, TM, GM] = {
-      lazy val p            = q
-      val parser: Parser[T, M, TM, GM] = for (a <- this; b <- commit(p)) yield a
+    override def <~![U](q: => Parser[U, M]): Parser[T, M] = {
+      lazy val p               = q
+      val parser: Parser[T, M] = for (a <- this; b <- commit(p)) yield a
       Parser(OnceParser(parser.apply), in => seqCompletions(in, p))
     }.named("<~!")
 
@@ -685,7 +693,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *         - `p` succeeds, ''or''
       *         - if `p` fails allowing back-tracking and `q` succeeds.
       */
-    override def |[U >: T](q: => Parser[U, M, TM, GM]): Parser[U, M, TM, GM] =
+    override def |[U >: T](q: => Parser[U, M]): Parser[U, M] =
       append(q).named("|")
 
     /** A parser combinator for alternative with longest match composition.
@@ -696,7 +704,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param q a parser that accepts if p consumes less characters. -- evaluated at most once, and only when necessary
       * @return a `Parser` that returns the result of the parser consuming the most characters (out of `p` and `q`).
       */
-    override def |||[U >: T](q: => Parser[U, M, TM, GM]): Parser[U, M, TM, GM] = {
+    override def |||[U >: T](q: => Parser[U, M]): Parser[U, M] = {
       lazy val p = q
       Parser(super[Parser].|||(q), in => this.completions(in) | p.completions(in))
     }
@@ -709,7 +717,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a parser that has the same behaviour as the current parser, but whose result is
       *         transformed by `f`.
       */
-    override def ^^[U](f: T => U): Parser[U, M, TM, GM] =
+    override def ^^[U](f: T => U): Parser[U, M] =
       Parser(super[Parser].^^(f), completions).named(toString + "^^")
 
     /** A parser combinator that changes a successful result into the specified value.
@@ -719,7 +727,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @param v The new result for the parser, evaluated at most once (if `p` succeeds), not evaluated at all if `p` fails.
       * @return a parser that has the same behaviour as the current parser, but whose successful result is `v`
       */
-    override def ^^^[U](v: => U): Parser[U, M, TM, GM] = {
+    override def ^^^[U](v: => U): Parser[U, M] = {
       Parser(super[Parser].^^^(v), completions)
     }.named(toString + "^^^")
 
@@ -736,7 +744,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a parser that succeeds if the current parser succeeds <i>and</i> `f` is applicable
       *         to the result. If so, the result will be transformed by `f`.
       */
-    override def ^?[U](f: PartialFunction[T, U], error: T => String): Parser[U, M, TM, GM] =
+    override def ^?[U](f: PartialFunction[T, U], error: T => String): Parser[U, M] =
       Parser(super[Parser].^?(f, error), completions).named(toString + "^?")
 
     /** A parser combinator for partial function application.
@@ -749,7 +757,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       * @return a parser that succeeds if the current parser succeeds <i>and</i> `f` is applicable
       *         to the result. If so, the result will be transformed by `f`.
       */
-    override def ^?[U](f: PartialFunction[T, U]): Parser[U, M, TM, GM] =
+    override def ^?[U](f: PartialFunction[T, U]): Parser[U, M] =
       Parser(super[Parser].^?(f), completions)
 
     /** A parser combinator that parameterizes a subsequent parser with the
@@ -774,7 +782,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *  @return a parser that succeeds if this parser succeeds (with result `x`)
       *          and if then `fq(x)` succeeds
       */
-    override def into[U](fq: T => Parser[U, M, TM, GM]): Parser[U, M, TM, GM] =
+    override def into[U](fq: T => Parser[U, M]): Parser[U, M] =
       Parser(super[Parser].into(fq), in => {
         this(in) match {
           case Success(result, next) => fq(result).completions(next)
@@ -783,7 +791,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       })
 
     /** Returns `into(fq)`. */
-    override def >>[U](fq: T => Parser[U, M, TM, GM]) = into(fq)
+    override def >>[U](fq: T => Parser[U, M]) = into(fq)
 
     /** Returns a parser that repeatedly parses what this parser parses.
       *
@@ -797,7 +805,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *
       *  @return chainl1(this, sep)
       */
-    override def *[U >: T](sep: => Parser[(U, U) => U, M, TM, GM]) = chainl1(this, sep)
+    override def *[U >: T](sep: => Parser[(U, U) => U, M]) = chainl1(this, sep)
 
     /** Returns a parser that repeatedly (at least once) parses what this parser parses.
       *
@@ -832,7 +840,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *  @param msg The message that will replace the default failure message.
       *  @return    A parser with the same properties and different failure message.
       */
-    override def withFailureMessage(msg: String) =
+    override def withFailureMessage(msg: String): Parser[T, M] =
       Parser(super[Parser].withFailureMessage(msg), completions)
 
     /** Changes the failure message produced by a parser.
@@ -856,20 +864,20 @@ trait CompletionSupport extends Parsers with CompletionTypes {
       *  @param msg The message that will replace the default failure message.
       *  @return    A parser with the same properties and different failure message.
       */
-    override def withErrorMessage(msg: String): Parser[T, M, TM, GM] =
+    override def withErrorMessage(msg: String): Parser[T, M] =
       Parser(super[Parser].withErrorMessage(msg), completions)
 
   }
 
-  protected def updateCompletionsTag[TM, M, GM](completions: Completions[M, TM, GM],
-                                     newTagLabel: Option[String] = None,
-                                     newTagScore: Option[Int] = None,
-                                     newTagDescription: Option[String] = None,
-                                     newTagMeta: Option[TM] = None) = {
+  protected def updateCompletionsTag[M](completions: Completions[M],
+                                        newTagLabel: Option[String] = None,
+                                        newTagScore: Option[Int] = None,
+                                        newTagDescription: Option[String] = None,
+                                        newTagMeta: Option[M] = None)(implicit encoder: Encoder[M]) = {
     completions.map(existingSet => CompletionSet(existingSet.tag.update(newTagLabel, newTagScore, newTagDescription, newTagMeta), existingSet.completions))
   }
 
-  private def updateCompletionsMeta[M](completions: Completions[M, _, _], newMeta: M) = {
+  private def updateCompletionsMeta[M](completions: Completions[M], newMeta: M)(implicit encoder: Encoder[M]) = {
     completions.map(set => set.map(e => e.withMeta(newMeta)))
   }
 
@@ -877,7 +885,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *  will give up as soon as it encounters an error, on failure it simply
     *  tries the next alternative).
     */
-  def commit[T](p: => Parser[T, _, _, _]): Parser[T, _, _, _] =
+  def commit[T, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
     Parser(super.commit(p), p.completions)
 
   /** A parser matching input elements that satisfy a given predicate.
@@ -889,7 +897,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *  @param  completions Possible alternatives (for completion)
     *  @return
     */
-  def elem(kind: String, p: Elem => Boolean, completions: Set[Elem] = Set()): Parser[Elem, Nothing, Nothing, Nothing] =
+  def elem(kind: String, p: Elem => Boolean, completions: Set[Elem] = Set()): Parser[Elem, Unit] =
     acceptIf(p, completions)(inEl => kind + " expected")
 
   /** A parser that matches only the given element `e`.
@@ -899,7 +907,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *  @param e the `Elem` that must be the next piece of input for the returned parser to succeed
     *  @return a `Parser` that succeeds if `e` is the next available input (and returns it).
     */
-  override def elem(e: Elem): Parser[Elem, Nothing, Nothing, Nothing] = accept(e)
+  override def elem(e: Elem): Parser[Elem, Unit] = accept(e)
 
   /** A parser that matches only the given element `e`.
     *
@@ -910,7 +918,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *  @param e the `Elem` that must be the next piece of input for the returned parser to succeed
     *  @return a `tParser` that succeeds if `e` is the next available input.
     */
-  override implicit def accept(e: Elem): Parser[Elem, Nothing, Nothing, Nothing] =
+  override implicit def accept(e: Elem): Parser[Elem, Unit] =
     acceptIf(_ == e, Set(e))("'" + e + "' expected but " + _ + " found")
 
   /** A parser that matches only the given list of element `es`.
@@ -920,7 +928,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @param  es the list of expected elements
     * @return a Parser that recognizes a specified list of elements
     */
-  override def accept[ES <% List[Elem]](es: ES): Parser[List[Elem], Nothing, Nothing, Nothing] =
+  override def accept[ES <% List[Elem]](es: ES): Parser[List[Elem], Unit] =
     acceptSeq(es)
 
   /** The parser that matches an element in the domain of the partial function `f`.
@@ -937,8 +945,8 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *  @return A parser that succeeds if `f` is applicable to the first element of the input,
     *          applying `f` to it to produce the result.
     */
-  def accept[U](expected: String, f: PartialFunction[Elem, U], completions: Set[Elem] = Set()): Parser[U, Nothing, Nothing, Nothing] =
-    acceptMatch(expected, f, completions.map(Completion(_)))
+  def accept[U](expected: String, f: PartialFunction[Elem, U], completions: Set[Elem] = Set()): Parser[U, Unit] =
+    acceptMatch(expected, f, completions.map(Completion[Unit]))
 
   /** A parser matching input elements that satisfy a given predicate.
     *
@@ -949,39 +957,40 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *  @param completions Possible completions
     *  @return        A parser for elements satisfying p(e).
     */
-  def acceptIf(p: Elem => Boolean, completions: Set[Elem])(err: Elem => String): Parser[Elem, Nothing, Nothing, Nothing] = {
+  def acceptIf(p: Elem => Boolean, completions: Set[Elem])(err: Elem => String): Parser[Elem, Unit] = {
     lazy val completionSet =
       if (completions.isEmpty)
         None
       else
-        Some(CompletionSet(completions.map(c => Completion(c))))
+        Some(CompletionSet(completions.map(c => Completion[Unit](c))))
     Parser(
       super.acceptIf(p)(err),
       in =>
         completionSet match {
-          case None => Completions.empty
+          case None => Completions.empty[Unit]
           case Some(c) =>
             super.acceptIf(p)(err)(in) match {
-              case Success(_, _) => Completions.empty
+              case Success(_, _) => Completions.empty[Unit]
               case _             => Completions(in.pos, c)
             }
       }
     )
   }
 
-  def acceptMatch[U, M](expected: String, f: PartialFunction[Elem, U], completions: Set[Completion[M]]): Parser[U, M, Nothing, Nothing] = {
+  def acceptMatch[U, M](expected: String, f: PartialFunction[Elem, U], completions: Set[Completion[M]])(implicit semigroup: Semigroup[M],
+                                                                                                        encoder: Encoder[M]): Parser[U, M] = {
     lazy val completionSet =
       if (completions.nonEmpty)
-        Some(CompletionSet(CompletionTag(expected), completions))
+        Some(CompletionSet(CompletionTag[M](expected), completions))
       else None
     Parser(
       super.acceptMatch(expected, f),
       in =>
         completionSet match {
-          case None => Completions.empty
+          case None => Completions.empty[M]
           case Some(c) =>
             super.acceptMatch(expected, f)(in) match {
-              case Success(_, _) => Completions.empty
+              case Success(_, _) => Completions.empty[M]
               case _             => Completions(in.pos, c)
             }
       }
@@ -995,7 +1004,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @param  es the list of expected elements
     * @return a Parser that recognizes a specified list of elements
     */
-  override def acceptSeq[ES <% Iterable[Elem]](es: ES): Parser[List[Elem]] =
+  override def acceptSeq[ES <% Iterable[Elem]](es: ES): Parser[List[Elem], Unit] =
     Parser(super.acceptSeq(es),
            in =>
              es.tail
@@ -1007,30 +1016,30 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @param msg The error message describing the failure.
     * @return A parser that always fails with the specified error message.
     */
-  override def failure(msg: String): Parser[Nothing] =
-    Parser(super.failure(msg), _ => Completions.empty)
+  override def failure(msg: String): Parser[Nothing, Unit] =
+    Parser(super.failure(msg), _ => Completions.empty[Unit])
 
   /** A parser that always succeeds.
     *
     * @param v The result for the parser
     * @return A parser that always succeeds, with the given result `v`
     */
-  override def success[T](v: T): Parser[T] =
-    Parser(super.success(v), _ => Completions.empty)
+  def success[T, M](v: T)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
+    Parser(super.success(v), _ => Completions.empty[M])
 
   /** A parser that results in an error.
     *
     * @param msg The error message describing the failure.
     * @return A parser that always fails with the specified error message.
     */
-  override def err(msg: String): Parser[Nothing] =
-    Parser(super.err(msg), _ => Completions.empty)
+  override def err(msg: String): Parser[Nothing, Unit] =
+    Parser(super.err(msg), _ => Completions.empty[Unit])
 
   /** A helper method that turns a `Parser` into one that will
     * print debugging information to stdout before and after
     * being applied.
     */
-  def log[T](p: => Parser[T])(name: String): Parser[T] =
+  def log[T, M](p: => Parser[T, M])(name: String)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
     Parser(
       in => {
         println(s"trying $name at \n${inputPositionDebugString(in)}")
@@ -1054,8 +1063,9 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @param p a `Parser` that is to be applied successively to the input
     * @return A parser that returns a list of results produced by repeatedly applying `p` to the input.
     */
-  def rep[T](p: => Parser[T]): Parser[List[T]] =
-    rep1(p) | success(List())
+  def rep[T, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[List[T], M] = {
+    rep1(p) | success[List[T], M](List[T]())
+  }
 
   /** A parser generator for interleaved repetitions.
     *
@@ -1069,8 +1079,9 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @return A parser that returns a list of results produced by repeatedly applying `p` (interleaved with `q`) to the input.
     *         The results of `p` are collected in a list. The results of `q` are discarded.
     */
-  def repsep[T](p: => Parser[T], q: => Parser[Any]): Parser[List[T]] =
-    rep1sep(p, q) | success(List())
+  def repsep[T, M](p: => Parser[T, M], q: => Parser[M, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[List[T], M] = {
+    rep1sep(p, q) | success[List[T], M](List[T]())
+  }
 
   /** A parser generator for non-empty repetitions.
     *
@@ -1081,7 +1092,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @return A parser that returns a list of results produced by repeatedly applying `p` to the input
     *        (and that only succeeds if `p` matches at least once).
     */
-  def rep1[T](p: => Parser[T]): Parser[List[T]] =
+  def rep1[T, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[List[T], M] =
     rep1(p, p)
 
   /** A parser generator for non-empty repetitions.
@@ -1095,12 +1106,12 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @return A parser that returns a list of results produced by first applying `f` and then
     *         repeatedly `p` to the input (it only succeeds if `f` matches).
     */
-  def rep1[T](first: => Parser[T], p0: => Parser[T]): Parser[List[T]] = {
+  def rep1[T, M](first: => Parser[T, M], p0: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[List[T], M] = {
     lazy val p = p0 // lazy argument
     Parser(
       super.rep1(first, p0),
       in => {
-        def continue(in: Input): Completions = {
+        def continue(in: Input): Completions[M] = {
           val currentCompletions = p.completions(in)
           p(in) match {
             case Success(_, rest) => currentCompletions | continue(rest)
@@ -1126,14 +1137,14 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @return    A parser that returns a list of results produced by repeatedly applying `p` to the input
     *        (and that only succeeds if `p` matches exactly `n` times).
     */
-  def repN[T](num: Int, p0: => Parser[T]): Parser[List[T]] = {
+  def repN[T, M](num: Int, p0: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[List[T], M] = {
     lazy val p = p0 // lazy argument
     if (num == 0) { success(Nil) } else {
       Parser(
         super.repN(num, p0),
         in => {
           var parsedCount = 0
-          def completions(in0: Input): Completions =
+          def completions(in0: Input): Completions[M] =
             if (parsedCount == num) {
               Completions.empty
             } else {
@@ -1163,7 +1174,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *         (and that only succeeds if `p` matches at least once).
     *         The results of `p` are collected in a list. The results of `q` are discarded.
     */
-  def rep1sep[T](p: => Parser[T], q: => Parser[Any]): Parser[List[T]] =
+  def rep1sep[T, M](p: => Parser[T, M], q: => Parser[Any, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[List[T], M] =
     p ~ rep(q ~> p) ^^ { case x ~ y => x :: y }
 
   /** A parser generator that, roughly, generalises the rep1sep generator so
@@ -1177,7 +1188,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @param q a parser that parses the token(s) separating the elements, yielding a left-associative function that
     *          combines two elements into one
     */
-  def chainl1[T](p: => Parser[T], q: => Parser[(T, T) => T]): Parser[T] =
+  def chainl1[T, M](p: => Parser[T, M], q: => Parser[(T, T) => T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
     chainl1(p, p, q)
 
   /** A parser generator that, roughly, generalises the `rep1sep` generator
@@ -1190,7 +1201,8 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *          yielding a left-associative function that combines two elements
     *          into one
     */
-  def chainl1[T, U](first: => Parser[T], p: => Parser[U], q: => Parser[(T, U) => T]): Parser[T] =
+  def chainl1[T, U, M](first: => Parser[T, M], p: => Parser[U, M], q: => Parser[(T, U) => T, M])(implicit semigroup: Semigroup[M],
+                                                                                                 encoder: Encoder[M]): Parser[T, M] =
     first ~ rep(q ~ p) ^^ {
       case x ~ xs =>
         xs.foldLeft(x: T) { case (a, f ~ b) => f(a, b) } // x's type annotation is needed to deal with changed type inference due to SI-5189
@@ -1209,7 +1221,8 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @param combine the "last" (left-most) combination function to be applied
     * @param first   the "first" (right-most) element to be combined
     */
-  def chainr1[T, U](p: => Parser[T], q: => Parser[(T, U) => U], combine: (T, U) => U, first: U): Parser[U] =
+  def chainr1[T, U, M](p: => Parser[T, M], q: => Parser[(T, U) => U, M], combine: (T, U) => U, first: U)(implicit semigroup: Semigroup[M],
+                                                                                                         encoder: Encoder[M]): Parser[U, M] =
     p ~ rep(q ~ p) ^^ {
       case x ~ xs =>
         (new ~(combine, x) :: xs).foldRight(first) { case (f ~ a, b) => f(a, b) }
@@ -1223,13 +1236,15 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @return a `Parser` that always succeeds: either with the result provided by `p` or
     *         with the empty result
     */
-  def opt[T](p: => Parser[T]): Parser[Option[T]] =
-    p ^^ (x => Some(x)) | success(None)
+  def opt[T, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[Option[T], M] = {
+    val empty: Parser[Option[T], M] = success(Option.empty[T])
+    p ^^ (x => Option(x)) | empty
+  }
 
   /** Wrap a parser so that its failures and errors become success and
     *  vice versa -- it never consumes any input.
     */
-  def not[T](p: => Parser[T]): Parser[Unit] =
+  def not[T, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[Unit, M] =
     Parser(super.not(p), _ => Completions.empty)
 
   /** A parser generator for guard expressions. The resulting parser will
@@ -1240,7 +1255,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     * @return A parser that returns success if and only if `p` succeeds but
     *         never consumes any input
     */
-  def guard[T](p: => Parser[T]): Parser[T] =
+  def guard[T, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
     Parser(super.guard(p), p.completions)
 
   /** `positioned` decorates a parser's result with the start position of the
@@ -1251,7 +1266,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *         result with the start position of the input it consumed,
     *         if it didn't already have a position.
     */
-  def positioned[T <: Positional](p: => Parser[T]): Parser[T] =
+  def positioned[T <: Positional, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
     Parser(super.positioned(p), p.completions)
 
   /** A parser generator delimiting whole phrases (i.e. programs).
@@ -1263,7 +1278,7 @@ trait CompletionSupport extends Parsers with CompletionTypes {
     *  @return  a parser that has the same result as `p`, but that only succeeds
     *           if `p` consumed all the input.
     */
-  def phrase[T](p: Parser[T]): Parser[T] =
+  def phrase[T, M](p: Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
     Parser(super.phrase(p), p.completions)
 
   protected def inputPositionDebugString(input: Input): String = if (input.source.length() == 0) "" else input.pos.longString

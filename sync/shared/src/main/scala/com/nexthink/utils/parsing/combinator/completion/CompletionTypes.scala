@@ -1,8 +1,10 @@
 package com.nexthink.utils.parsing.combinator.completion
 
+import cats.Semigroup
 import io.circe.syntax._
-import io.circe.Json
+import io.circe.{Encoder, Json, ObjectEncoder}
 import io.circe.generic.auto._
+
 import scala.util.parsing.input.{NoPosition, Position}
 import com.nexthink.utils.parsing.collections.SortingHelpers.lazyQuicksort
 
@@ -28,6 +30,7 @@ import scala.language.implicitConversions
 trait CompletionTypes {
   type Elem
   type Elems = Seq[Elem]
+  implicit val elemsEncoder: Encoder[Elems]
 
   val DefaultCompletionTag   = ""
   val DefaultCompletionScore = 0
@@ -38,7 +41,7 @@ trait CompletionTypes {
     * @param description tag description (optional) - can be used for additional information e.g. for a tooltip
     * @param meta tag meta (optional) - can be used e.g. to define visual style
     */
-  case class CompletionTag[M](label: String, score: Int, description: Option[String], meta: Option[M]) {
+  case class CompletionTag[M](label: String, score: Int, description: Option[String], meta: Option[M])(implicit encoder: Encoder[M]) {
     def update(newTag: Option[String], newScore: Option[Int], newDescription: Option[String], newMeta: Option[M]): CompletionTag[M] =
       copy(
         label = newTag.getOrElse(label),
@@ -46,36 +49,39 @@ trait CompletionTypes {
         description = newDescription.map(Some(_)).getOrElse(description),
         meta = newMeta.map(Some(_)).getOrElse(meta)
       )
-    def withMeta[M](newMeta: M): CompletionTag[M] = copy(meta = Some(newMeta))
+    def withMeta[NM](newMeta: NM)(implicit encoder: Encoder[NM]): CompletionTag[NM] = copy(meta = Some(newMeta))
 
     override def toString: String = this.asJson.spaces2
     def toJson: Json              = this.asJson
   }
 
   case object CompletionTag {
-    val Default =
-      CompletionTag(DefaultCompletionTag, DefaultCompletionScore, None, None)
-    def apply(label: String): CompletionTag[Nothing] =
+    def default[M](implicit encoder: Encoder[M]) =
+      CompletionTag[M](DefaultCompletionTag, DefaultCompletionScore, None, None)
+    def apply[M](label: String)(implicit encoder: Encoder[M]): CompletionTag[M] =
       CompletionTag(label, DefaultCompletionScore, None, None)
-    def apply[M](label: String, meta: M): CompletionTag[M] =
+    def apply[M](label: String, meta: M)(implicit encoder: Encoder[M]): CompletionTag[M] =
       CompletionTag(label, DefaultCompletionScore, None, Some(meta))
-    def apply(label: String, score: Int): CompletionTag[Nothing] =
+    def apply[M](label: String, score: Int)(implicit encoder: Encoder[M]): CompletionTag[M] =
       CompletionTag(label, score, None, None)
-    def apply[M](label: String, score: Int, meta: M): CompletionTag[M] =
+    def apply[M](label: String, score: Int, meta: M)(implicit encoder: Encoder[M]): CompletionTag[M] =
       CompletionTag(label, score, None, Some(meta))
-    def apply(label: String, score: Int, description: String): CompletionTag[Nothing] =
+    def apply[M](label: String, score: Int, description: String)(implicit encoder: Encoder[M]): CompletionTag[M] =
       CompletionTag(label, score, Some(description), None)
+
+    implicit def encodeTag[M](implicit encoder: Encoder[M]): ObjectEncoder[CompletionTag[M]] =
+      Encoder.forProduct4("label", "score", "description", "meta")(t => (t.label, t.score, t.description, t.meta))
   }
 
   /** Set of related completion entries
     * @param tag set tag
     * @param completions set of unique completion entries
     */
-  case class CompletionSet[M, TM](tag: CompletionTag[TM], completions: immutable.HashMap[Elems, Completion[M]]) {
+  case class CompletionSet[M](tag: CompletionTag[M], completions: immutable.HashMap[Elems, Completion[M]])(implicit encoder: Encoder[M]) {
     def label: String                          = tag.label
     def score: Int                             = tag.score
     def description: Option[String]            = tag.description
-    def meta: Option[TM]                       = tag.meta
+    def meta: Option[M]                        = tag.meta
     def entries: Iterable[Completion[M]]       = completions.values
     def sortedEntries: Seq[Completion[M]]      = entries.toSeq.sorted
     def stringEntries: Seq[String]             = sortedEntries.map(_.value.toString)
@@ -85,45 +91,42 @@ trait CompletionTypes {
   }
 
   case object CompletionSet {
-    def apply[M, TM](tag: CompletionTag[TM], completions: Seq[(Elems, Completion[M])]): CompletionSet[M, TM] =
+    def apply[M](tag: CompletionTag[M], completions: Seq[(Elems, Completion[M])])(implicit encoder: Encoder[M]): CompletionSet[M] =
       CompletionSet(tag, immutable.HashMap(completions: _*))
 
-    def apply(tag: String, el: Elem): CompletionSet[Nothing, Nothing] =
-      CompletionSet(CompletionTag(tag), Seq(Seq(el) -> Completion(el)))
+    def apply[M](tag: String, el: Elem)(implicit encoder: Encoder[M]): CompletionSet[M] =
+      CompletionSet(CompletionTag[M](tag), Seq(Seq(el) -> Completion[M](el)))
 
-    def apply(tag: String, elems: Elems): CompletionSet[Nothing, Nothing] =
-      CompletionSet(CompletionTag(tag), Seq(elems -> Completion(elems)))
+    def apply[M](tag: String, elems: Elems)(implicit encoder: Encoder[M]): CompletionSet[M] =
+      CompletionSet(CompletionTag[M](tag), Seq(elems -> Completion[M](elems)))
 
-    def apply[M](tag: String, completion: Completion[M]): CompletionSet[M, Nothing] =
-      CompletionSet(CompletionTag(tag), Seq(completion.value -> completion))
+    def apply[M](tag: String, completion: Completion[M])(implicit encoder: Encoder[M]): CompletionSet[M] =
+      CompletionSet(CompletionTag[M](tag), Seq(completion.value -> completion))
 
-    def apply[M, TM](tag: CompletionTag[TM], completions: Iterable[Completion[M]]): CompletionSet[M, TM] =
+    def apply[M](tag: CompletionTag[M], completions: Iterable[Completion[M]])(implicit encoder: Encoder[M]): CompletionSet[M] =
       CompletionSet(tag, completions.map(c => c.value -> c).toSeq)
 
-    def apply[M](tag: String, completions: Iterable[Completion[M]]): CompletionSet[M, Nothing] =
-      CompletionSet(CompletionTag(tag), completions.map(c => c.value -> c).toSeq)
+    def apply[M](tag: String, completions: Iterable[Completion[M]])(implicit encoder: Encoder[M]): CompletionSet[M] =
+      CompletionSet(CompletionTag[M](tag), completions.map(c => c.value -> c).toSeq)
 
-    def apply[M](completions: Iterable[Completion[M]]): CompletionSet[M, Nothing] =
-      CompletionSet(CompletionTag.Default, completions.map(c => c.value -> c).toSeq)
+    def apply[M](completions: Iterable[Completion[M]])(implicit encoder: Encoder[M]): CompletionSet[M] =
+      CompletionSet(CompletionTag.default[M], completions.map(c => c.value -> c).toSeq)
 
-    def apply(completions: Iterable[Completion[Nothing]]): CompletionSet[Nothing, Nothing] =
-      CompletionSet(CompletionTag.Default, completions.map(c => c.value -> c).toSeq)
+    def apply[M](completions: Completion[M]*)(implicit encoder: Encoder[M]): CompletionSet[M] =
+      CompletionSet(CompletionTag.default[M], completions.map(c => c.value -> c))
 
-    def apply[M](completions: Completion[M]*): CompletionSet[M, Nothing] =
-      CompletionSet(CompletionTag.Default, completions.map(c => c.value -> c))
+    def apply[M](el: Elem)(implicit encoder: Encoder[M]): CompletionSet[M] =
+      CompletionSet(CompletionTag.default[M], Seq(Seq(el) -> Completion[M](el)))
 
-    def apply[M](completions: Completion[Nothing]*): CompletionSet[Nothing, Nothing] =
-      CompletionSet(CompletionTag.Default, completions.map(c => c.value -> c))
+    def apply[M](completions: Traversable[Elems])(implicit encoder: Encoder[M]): CompletionSet[M] =
+      CompletionSet(CompletionTag.default[M], completions.map(c => c -> Completion[M](c)).toSeq)
 
-    def apply(el: Elem): CompletionSet[Nothing, Nothing] =
-      CompletionSet(CompletionTag.Default, Seq(Seq(el) -> Completion(el)))
+    implicit def orderingByScoreAndThenAlphabetical[M]: Ordering[CompletionSet[M]] = Ordering.by(s => (-s.score, s.label))
 
-    def apply(completions: Traversable[Elems]): CompletionSet[Nothing, Nothing] =
-      CompletionSet(CompletionTag.Default, completions.map(c => c -> Completion(c)).toSeq)
+    def empty[M](implicit encoder: Encoder[M]) = new CompletionSet[M](CompletionTag.default[M], immutable.HashMap())
 
-    implicit def orderingByScoreAndThenAlphabetical: Ordering[CompletionSet[_, _]] = Ordering.by(s => (-s.score, s.label))
-
-    val empty = CompletionSet()
+    implicit def setEncoder[M](implicit encoder: Encoder[M]): ObjectEncoder[CompletionSet[M]] =
+      Encoder.forProduct2("tag", "completions")(s => (s.tag, s.completions.toSeq))
   }
 
   /** Completion entry
@@ -131,45 +134,47 @@ trait CompletionTypes {
     * @param score entry score (defines the order of entries within a set, the higher the better)
     * @param meta entry meta (e.g. visual style)
     */
-  case class Completion[M](value: Elems, score: Int = DefaultCompletionScore, meta: Option[M] = None) {
+  case class Completion[M](value: Elems, score: Int = DefaultCompletionScore, meta: Option[M] = None)(implicit encoder: Encoder[M]) {
     require(value.nonEmpty, "empty completion")
-    def withMeta[NM](newMeta: NM): Completion[NM] = copy(meta = Some(newMeta))
+    def withMeta[NM](newMeta: NM)(implicit encoder: Encoder[NM]): Completion[NM] = copy(meta = Some(newMeta))
 
     def toJson: Json              = this.asJson
     override def toString: String = this.asJson.spaces2
   }
   case object Completion {
-    def apply(el: Elem): Completion[Nothing] = Completion(Seq(el))
-    implicit def orderingByScoreAndThenAlphabetical: Ordering[Completion[_]] =
+    def apply[M](el: Elem)(implicit encoder: Encoder[M]): Completion[M] = Completion[M](Seq(el))
+    def apply(el: Elem): Completion[Unit]                               = apply[Unit](el)
+    def apply(els: Elems): Completion[Unit]                             = apply[Unit](els)
+    implicit def orderingByScoreAndThenAlphabetical[M]: Ordering[Completion[M]] =
       Ordering.by(c => (-c.score, c.value.toString))
+    implicit def encoder[M](implicit encoder: Encoder[M]): ObjectEncoder[Completion[M]] =
+      Encoder.forProduct3("value", "score", "meta")(c => (c.value, c.score, c.meta))
   }
 
   /** Result of parser completion, listing the possible entry alternatives at a certain input position
     * @param position position in the input where completion entries apply
     * @param sets completion entries, grouped per tag
     */
-  case class Completions[M, TM, GM](position: Position, meta: Option[GM], sets: immutable.HashMap[String, CompletionSet[M, TM]])(
-      implicit mergeMeta: (M, M) => M,
-      mergeTagMeta: (TM, TM) => TM,
-      mergeGlobalMeta: (GM, GM) => GM) {
-    def isEmpty: Boolean                                      = sets.isEmpty
-    def nonEmpty: Boolean                                     = !isEmpty
-    def setWithTag(tag: String): Option[CompletionSet[M, TM]] = sets.get(tag)
-    def allSets: Iterable[CompletionSet[M, TM]]               = sets.values.toSeq.sorted
-    def allCompletions: Iterable[Completion[_]]               = allSets.flatMap(_.sortedEntries)
-    def defaultSet: Option[CompletionSet[M, TM]]              = sets.get("")
-    def withMeta[NGM](newMeta: NGM): Completions[M, TM, NGM]  = copy(meta = Some(newMeta))
-    def map[NM, NTM](f: CompletionSet[M, TM] => CompletionSet[NM, NTM])  = Completions(position, meta, sets.values.map(f).toSeq)
+  case class Completions[M](position: Position, meta: Option[M], sets: immutable.HashMap[String, CompletionSet[M]])(implicit semigroup: Semigroup[M],
+                                                                                                                    encoder: Encoder[M]) {
+    def isEmpty: Boolean                                  = sets.isEmpty
+    def nonEmpty: Boolean                                 = !isEmpty
+    def setWithTag(tag: String): Option[CompletionSet[M]] = sets.get(tag)
+    def allSets: Iterable[CompletionSet[M]]               = sets.values.toSeq.sorted
+    def allCompletions: Iterable[Completion[_]]           = allSets.flatMap(_.sortedEntries)
+    def defaultSet: Option[CompletionSet[M]]              = sets.get("")
+    def withMeta(newMeta: M): Completions[M]              = copy(meta = Some(newMeta))
+    def map(f: CompletionSet[M] => CompletionSet[M])      = Completions(position, meta, sets.values.map(f).toSeq)
 
     override def toString: String = this.asJson.spaces2
     def toJson: Json              = this.asJson
     def setsToJson: Json          = allSets.asJson
 
-    private def mergeMetaData[T](left: Option[T], right: Option[T])(merge: (T, T) => T) =
+    private def mergeMetaData(left: Option[M], right: Option[M]) =
       if (left == right) left
       else
         (left, right) match {
-          case (Some(l), Some(r)) => Some(merge(l, r))
+          case (Some(l), Some(r)) => Some(semigroup.combine(l, r))
           case (Some(l), None)    => Some(l)
           case (None, Some(r))    => Some(r)
           case (None, None)       => None
@@ -183,21 +188,18 @@ trait CompletionTypes {
         Completion(
           left.value,
           left.score.max(right.score),
-          mergeMetaData(left.meta, right.meta)(mergeMeta)
+          mergeMetaData(left.meta, right.meta)
         )
       }
     }
 
-    private def mergeSets(left: CompletionSet[M, TM], right: CompletionSet[M, TM]): CompletionSet[M, TM] = {
+    private def mergeSets(left: CompletionSet[M], right: CompletionSet[M]): CompletionSet[M] = {
       if (left == right) {
         left
       } else {
         assert(left.label == right.label, "Attempt to merge sets with different completion tags")
         CompletionSet(
-          CompletionTag(left.tag.label,
-                        left.score.max(right.score),
-                        left.description.orElse(right.description),
-                        mergeMetaData(left.meta, right.meta)(mergeTagMeta)),
+          CompletionTag(left.tag.label, left.score.max(right.score), left.description.orElse(right.description), mergeMetaData(left.meta, right.meta)),
           left.completions.merged(right.completions)((l, r) => {
             val (leftLabel, leftCompletion) = l
             val (_, rightCompletion)        = r
@@ -207,25 +209,24 @@ trait CompletionTypes {
       }
     }
 
-    def |(other: Completions[M, TM, GM]): Completions[M, TM, GM] = {
-      other match {
-        case Completions.empty => this
-        case _ =>
-          other.position match {
-            case otherPos if otherPos < position => this
-            case otherPos if otherPos == position =>
-              Completions(
-                position,
-                mergeMetaData(meta, other.meta)(mergeGlobalMeta),
-                sets.merged(other.sets)((l, r) => {
-                  val (leftLabel, leftCompletion) = l
-                  val (_, rightCompletions)       = r
-                  (leftLabel, mergeSets(leftCompletion, rightCompletions))
-                })
-              )
-            case _ => other
-          }
-      }
+    def |(other: Completions[M]): Completions[M] = {
+      if (other == Completions.empty)
+        this
+      else
+        other.position match {
+          case otherPos if otherPos < position => this
+          case otherPos if otherPos == position =>
+            Completions(
+              position,
+              mergeMetaData(meta, other.meta),
+              sets.merged(other.sets)((l, r) => {
+                val (leftLabel, leftCompletion) = l
+                val (_, rightCompletions)       = r
+                (leftLabel, mergeSets(leftCompletion, rightCompletions))
+              })
+            )
+          case _ => other
+        }
     }
 
     def completionStrings: Seq[String] =
@@ -235,7 +236,7 @@ trait CompletionTypes {
         .flatMap(_.stringEntries)
         .toList
 
-    def takeTop(count: Int): Completions[M, TM, GM] = {
+    def takeTop(count: Int): Completions[M] = {
       val allEntries = allSets.toStream.flatMap(s => s.entries.toStream.map((_, s.tag)))
       val sortedEntries =
         lazyQuicksort(allEntries)(Ordering.by {
@@ -251,41 +252,47 @@ trait CompletionTypes {
       Completions(position, meta, regroupedSets.map(s => s.tag.label -> s).toSeq)
     }
 
-    def setsScoredWithMaxCompletion(): Completions[M, TM, GM] = {
+    def setsScoredWithMaxCompletion(): Completions[M] = {
       Completions(position, meta, sets.mapValues(s => CompletionSet(s.tag.copy(score = s.completions.values.map(_.score).max), s.completions)).toSeq)
     }
   }
 
   case object Completions {
-    def apply[M, TM, GM](position: Position, meta: Option[GM], completionSets: Seq[(String, CompletionSet[M, TM])]): Completions[M, TM, GM] =
+    def apply[M](position: Position, meta: Option[M], completionSets: Seq[(String, CompletionSet[M])])(implicit semigroup: Semigroup[M],
+                                                                                                       encoder: Encoder[M]): Completions[M] =
       Completions(position, meta, immutable.HashMap(completionSets: _*))
 
-    def apply[M, TM](position: Position, completionSet: CompletionSet[M, TM]): Completions[M, TM, Nothing] =
+    def apply[M](position: Position, completionSet: CompletionSet[M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] =
       Completions(position, None, Seq(completionSet.tag.label -> completionSet))
 
-    def apply[M, TM, GM](position: Position, meta: Option[GM], completionSet: CompletionSet[M, TM]): Completions[M, TM, GM] =
+    def apply[M](position: Position, meta: Option[M], completionSet: CompletionSet[M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] =
       Completions(position, meta, Seq(completionSet.tag.label -> completionSet))
 
-    def apply[GM](position: Position, meta: Option[GM], completions: Traversable[Elems]): Completions[Nothing, Nothing, GM] =
-      Completions(position, meta, CompletionSet(completions))
+    def apply[M](position: Position, meta: Option[M], completions: Traversable[Elems])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] =
+      Completions(position, meta, CompletionSet[M](completions))
 
-    def apply(position: Position, completions: Traversable[Elems]): Completions[Nothing, Nothing, Nothing] =
-      Completions(position, None, CompletionSet(completions))
+    def apply[M](position: Position, completions: Traversable[Elems])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] =
+      Completions(position, None, CompletionSet[M](completions))
 
-    def apply[M, TM, GM](position: Position, meta: Option[GM], completionSets: Iterable[CompletionSet[M, TM]]): Completions[M, TM, GM] =
+    def apply[M](position: Position, meta: Option[M], completionSets: Iterable[CompletionSet[M]])(implicit semigroup: Semigroup[M],
+                                                                                                  encoder: Encoder[M]): Completions[M] =
       Completions(position, meta, completionSets.map(s => s.tag.label -> s).toSeq)
 
-    def apply[M, TM](position: Position, completionSets: Iterable[CompletionSet[M, TM]]): Completions[M, TM, Nothing] =
+    def apply[M](position: Position, completionSets: Iterable[CompletionSet[M]])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] =
       Completions(position, None, completionSets.map(s => s.tag.label -> s).toSeq)
 
-    def apply[M, TM](completionSet: CompletionSet[M, TM]): Completions[M, TM, Nothing] =
+    def apply[M](completionSet: CompletionSet[M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] =
       Completions(NoPosition, None, completionSet)
 
-    def apply[M, TM](completionSets: Iterable[CompletionSet[M, TM]]): Completions[M, TM, Nothing] =
+    def apply[M](completionSets: Iterable[CompletionSet[M]])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] =
       Completions(NoPosition, None, completionSets.map(s => s.tag.label -> s).toSeq)
 
-    def empty[M, TM] = Completions(NoPosition, None, immutable.HashMap[String, CompletionSet[M, TM]]())
+    def empty[M](implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] =
+      Completions(NoPosition, None, immutable.HashMap[String, CompletionSet[M]]())
 
+    implicit val positionEncoder: Encoder[Position] = Encoder.forProduct2("line", "column")(p => (p.line, p.column))
+    implicit def completionsEncoder[M](implicit encoder: Encoder[M]): ObjectEncoder[Completions[M]] =
+      Encoder.forProduct3("position", "meta", "sets")(c => (c.position, c.meta, c.allSets))
   }
 
 }

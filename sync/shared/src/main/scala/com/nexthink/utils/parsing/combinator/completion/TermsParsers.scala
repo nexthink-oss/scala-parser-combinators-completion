@@ -23,7 +23,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
     * @param maxCompletionsCount maximum number of completions returned by the parser
     * @return parser instance
     */
-  def oneOfTerms(terms: Seq[String], maxCompletionsCount: Int): Parser[String] = {
+  def oneOfTerms(terms: Seq[String], maxCompletionsCount: Int): Parser[String, Unit] = {
     TermsParser(terms, maxCompletionsCount)
   }
 
@@ -52,12 +52,12 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
   def oneOfTermsFuzzy(terms: Seq[String],
                       maxCompletionsCount: Int,
                       similarityMeasure: (String, String) => Double = diceSorensenSimilarity,
-                      similarityThreshold: Int = defaultSimilarityThreshold): Parser[String] = {
+                      similarityThreshold: Int = defaultSimilarityThreshold): Parser[String, Unit] = {
     FuzzyParser(terms, similarityMeasure, similarityThreshold, maxCompletionsCount)
   }
 
   private object TermsParser {
-    def apply(terms: Seq[String], maxCompletionsCount: Int): Parser[String] = {
+    def apply(terms: Seq[String], maxCompletionsCount: Int): Parser[String, Unit] = {
       if (terms.isEmpty) {
         failure("empty terms")
       } else {
@@ -72,7 +72,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
     }
   }
 
-  sealed private class TermsParser(trie: Trie, maxCompletionsCount: Int, completionsWhenInputEmpty: CompletionSet) extends Parser[String] {
+  sealed private class TermsParser(trie: Trie, maxCompletionsCount: Int, completionsWhenInputEmpty: CompletionSet[Unit]) extends Parser[String, Unit] {
     override def apply(in: Input): ParseResult[String] = {
       tryParse(in) match {
         case Right(MatchingTerms(terms, _)) => Success(terms.last.term, in.drop(terms.last.column - in.pos.column))
@@ -86,7 +86,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       }
     }
 
-    override def completions(in: Input): Completions = {
+    override def completions(in: Input): Completions[Unit] = {
       if (tryParse(in).isRight)
         Completions.empty
       else {
@@ -113,7 +113,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
   private def normalizedTerms(terms: Seq[String])      = terms.map(_.toLowerCase)
 
   private object FuzzyParser {
-    def apply(terms: Seq[String], similarityMeasure: (String, String) => Double, similarityThreshold: Int, maxCompletionsCount: Int): Parser[String] = {
+    def apply(terms: Seq[String], similarityMeasure: (String, String) => Double, similarityThreshold: Int, maxCompletionsCount: Int): Parser[String, Unit] = {
       if (terms.isEmpty) {
         failure("empty terms")
       } else {
@@ -136,13 +136,13 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
 
   sealed private class FuzzyParser private (ngramMap: PrefixMap[Array[String]],
                                             trie: Trie,
-                                            completionsWhenInputEmpty: CompletionSet,
+                                            completionsWhenInputEmpty: CompletionSet[Unit],
                                             similarityMeasure: (String, String) => Double,
                                             similarityThreshold: Int,
                                             maxCompletionsCount: Int)
       extends TermsParser(trie, maxCompletionsCount, completionsWhenInputEmpty) {
 
-    override def completions(in: Input): Completions = {
+    override def completions(in: Input): Completions[Unit] = {
       if (tryParse(in).isRight)
         Completions.empty
       else {
@@ -175,7 +175,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
       iter(ngrams.head, ngrams.tail, Set(), Map())
     }
 
-    private def fuzzyCompletions(start: Input): Completions = {
+    private def fuzzyCompletions(start: Input): Completions[Unit] = {
       val incompleteTerm = remainder(start)
       val candidates     = findCandidateMatches(incompleteTerm)
       val rankedCompletions = lazyQuicksort(
@@ -190,7 +190,7 @@ trait TermsParsers extends RegexParsers with RegexCompletionSupport with TermsPa
         .take(maxCompletionsCount)
       if (rankedCompletions.nonEmpty) {
         Completions(start.pos, CompletionSet(rankedCompletions.map {
-          case (term: String, score: Int) => Completion(term, score)
+          case (term: String, score: Int) => Completion[Unit](term, score)
         }))
       } else {
         Completions.empty

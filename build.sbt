@@ -38,8 +38,8 @@ lazy val async = crossProject
     name := "scala-parser-combinators-completion-async",
     // cats & monix
     libraryDependencies ++= Seq(
-      "io.monix" %%% "monix-eval" % "2.3.0",
-      "io.monix" %%% "monix-cats" % "2.3.0"
+      "io.monix" %%% "monix-eval" % "2.3.3",
+      "io.monix" %%% "monix-cats" % "2.3.3"
     )
   )
 lazy val asyncJVM = async.jvm
@@ -74,12 +74,12 @@ lazy val commonSettings = Seq(
                              sys.env.getOrElse("SONATYPE_USER", ""),
                              sys.env.getOrElse("SONATYPE_PASSWORD", "")),
   libraryDependencies ++= Seq(
-    "org.scala-lang.modules"     %%% "scala-parser-combinators" % "1.0.6",
+    "org.scala-lang.modules"     %%% "scala-parser-combinators" % "1.1.0",
     "io.circe"                   %%% "circe-core" % "0.9.1",
     "io.circe"                   %%% "circe-generic" % "0.9.1",
     "io.circe"                   %%% "circe-parser" % "0.9.1",
-    "org.typelevel"              %%% "cats-laws" % "1.0.0-MF" % Test,
-    "org.typelevel"              %%% "cats-testkit" % "1.0.0-MF" % Test,
+    "org.typelevel"              %%% "cats-laws" % "1.0.1" % Test,
+    "org.typelevel"              %%% "cats-testkit" % "1.0.1" % Test,
     "com.github.alexarchambault" %%% "scalacheck-shapeless_1.13" % "1.1.6" % Test,
     "org.scalacheck"             %%% "scalacheck" % "1.13.4" % Test,
     "org.scalatest"              %%% "scalatest" % "3.0.4" % Test

@@ -9,8 +9,8 @@ class CompletionForSimpleGrammarTest extends FlatSpec with Matchers {
   object SimpleGrammar extends CompletionTestAsserters with RegexCompletionSupport {
     val number = "[0-9]+".r %> ("1", "10", "99") % "number" %? "any number"
 
-    def expr: Parser[Int] = term | "(" ~> term <~ ")"
-    def term: Parser[Int] = number ^^ {
+    def expr = term | "(" ~> term <~ ")"
+    def term = number ^^ {
       _.toInt
     }
   }
@@ -18,8 +18,8 @@ class CompletionForSimpleGrammarTest extends FlatSpec with Matchers {
   object AsyncSimpleGrammar extends CompletionTestAsserters with AsyncRegexCompletionSupport {
     val number = "[0-9]+".r %> ("1", "10", "99") % "number" %? "any number"
 
-    def expr: AsyncParser[Int] = term | "(" ~> term <~ ")"
-    def term: AsyncParser[Int] = number ^^ {
+    def expr = term | "(" ~> term <~ ")"
+    def term = number ^^ {
       _.toInt
     }
   }

@@ -2,9 +2,9 @@ package com.nexthink.utils.parsing.combinator.completion
 
 import cats._
 import cats.implicits._
-import cats.kernel.Monoid
+import cats.kernel.{Monoid, Semigroup}
+import io.circe.Encoder
 import monix.eval.Task
-import org.json4s.JValue
 
 import scala.collection.mutable.ListBuffer
 import scala.language.higherKinds
@@ -12,37 +12,40 @@ import scala.util.parsing.input.Positional
 import scala.util.parsing.input.NoPosition
 
 trait AsyncCompletionSupport extends CompletionSupport {
-  implicit val completionsMonoid: Monoid[Completions] =
-    new Monoid[Completions] {
-      override def empty: Completions                                   = Completions.empty
-      override def combine(x: Completions, y: Completions): Completions = x | y
+  implicit def completionsMonoid[M](implicit semigroup: Semigroup[M], encoder: Encoder[M]): Monoid[Completions[M]] =
+    new Monoid[Completions[M]] {
+      override def empty: Completions[M]                                         = Completions.empty[M]
+      override def combine(x: Completions[M], y: Completions[M]): Completions[M] = x | y
     }
   implicit def taskSemigroup[T](implicit ev: Semigroup[T]) = new Semigroup[Task[T]]() {
     override def combine(x: Task[T], y: Task[T]) = Task.mapBoth(x, y)(ev.combine)
   }
 
-  implicit class ConvertibleParser[T](p: => Parser[T]) {
-    def toAsync(): AsyncParser[T] = parserToAsync(p)
+  implicit class ConvertibleParser[T, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]) {
+    def toAsync(): AsyncParser[T, M] = parserToAsync(p)
   }
-  implicit def parserToAsync[T](p: => Parser[T]): AsyncParser[T] = new AsyncParser[T] {
+  implicit def parserToAsync[T, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[T, M] = new AsyncParser[T, M] {
     def apply(in: Input)       = Task.eval(p.apply(in))
     def completions(in: Input) = Task.eval(p.completions(in))
   }
 
-  def AsyncParser[T](af: Input => Task[ParseResult[T]], ac: Input => Task[Completions]): AsyncParser[T] =
-    new AsyncParser[T] {
-      def apply(in: Input): Task[ParseResult[T]]             = af(in)
-      override def completions(in: Input): Task[Completions] = ac(in)
+  def AsyncParser[T, M](af: Input => Task[ParseResult[T]], ac: Input => Task[Completions[M]])(implicit semigroup: Semigroup[M],
+                                                                                              encoder: Encoder[M]): AsyncParser[T, M] =
+    new AsyncParser[T, M] {
+      def apply(in: Input): Task[ParseResult[T]]                = af(in)
+      override def completions(in: Input): Task[Completions[M]] = ac(in)
     }
 
-  abstract class AsyncParser[+T] extends (Input => Task[ParseResult[T]]) with CombinableParser[T, AsyncParser] {
+  abstract class AsyncParser[+T, M](implicit semigroup: Semigroup[M], encoder: Encoder[M])
+      extends (Input => Task[ParseResult[T]])
+      with CombinableParser[T, AsyncParser, M] {
     private var name: String        = ""
     def named(n: String): this.type = { name = n; this }
     override def toString()         = "AsyncParser (" + name + ")"
 
-    def completions(in: Input): Task[Completions]
+    def completions(in: Input): Task[Completions[M]]
 
-    private def append[U >: T](p0: => AsyncParser[U]): AsyncParser[U] = {
+    private def append[U >: T](p0: => AsyncParser[U, M]): AsyncParser[U, M] = {
       lazy val p = p0
       AsyncParser(
         in => Task.mapBoth(this(in), p0(in))((x, y) => x append y),
@@ -67,7 +70,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       )
     }
 
-    private def seqCompletions[U](in: Input, other: => AsyncParser[U]): Task[Completions] = {
+    private def seqCompletions[U](in: Input, other: => AsyncParser[U, M]): Task[Completions[M]] = {
       lazy val thisCompletions = this.completions(in)
       this(in) flatMap {
         case Success(_, rest) => {
@@ -82,40 +85,40 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param completions possible completions for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completions
       */
-    def %>(completions: Elems*): AsyncParser[T] =
-      %>(CompletionSet(completions.map(el => Completion(el))))
+    def %>(completions: Elems*): AsyncParser[T, M] =
+      %>(CompletionSet(completions.map(el => Completion[M](el))))
 
     /** An operator to specify completion of a parser
       * @param completion completion for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completion
       */
-    def %>(completion: Completion): AsyncParser[T] = %>(CompletionSet(completion))
+    def %>(completion: Completion[M]): AsyncParser[T, M] = %>(CompletionSet(completion))
 
     /** An operator to specify completions of a parser
       * @param completions possible completions for this parser
       * @return a `Parser` that upon invocation of the `completions` method returns the passed completions
       */
-    def %>(completions: CompletionSet): AsyncParser[T] =
+    def %>(completions: CompletionSet[M]): AsyncParser[T, M] =
       AsyncParser(this,
                   in =>
                     this(in).map {
                       case Failure(_, rest) if rest.atEnd =>
                         Completions(rest.pos, completions)
-                      case _ => Completions.empty
+                      case _ => Completions.empty[M]
                   })
 
     /** An operator to specify completions of a parser
       * @param completioner function of input to completions
       * @return a `Parser` that upon invocation of the `completions` method will invoke the passed function
       */
-    def %>(completioner: Input => Task[Completions]): AsyncParser[T] =
+    def %>(completioner: Input => Task[Completions[M]]): AsyncParser[T, M] =
       AsyncParser(this, completioner)
 
     /** Limits completions to the top `n` completions ordered by their score
       * @param n the limit
       * @return wrapper `Parser` instance limiting the number of completions
       */
-    def topCompletions(n: Int): AsyncParser[T] =
+    def topCompletions(n: Int): AsyncParser[T, M] =
       AsyncParser(
         this,
         in => this.completions(in).map(_.takeTop(n))
@@ -125,14 +128,14 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param tag the completion tag (to be used e.g. to structure a completion menu)
       * @return wrapper `Parser` instance specifying the completion tag
       */
-    def %(tag: String): AsyncParser[T] =
+    def %(tag: String): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(updateCompletionsTag(_, Some(tag))))
 
     /** An operator to specify the completions tag score of a parser (0 by default)
       * @param tagScore the completion tag score (to be used e.g. to order sections in a completion menu)
       * @return wrapper `Parser` instance specifying the completion tag score
       */
-    def %(tagScore: Int): AsyncParser[T] =
+    def %(tagScore: Int): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(updateCompletionsTag(_, None, Some(tagScore))))
 
     /** An operator to specify the completion tag and score of a parser
@@ -140,7 +143,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param tagScore the completion tag score
       * @return wrapper `Parser` instance specifying the completion tag
       */
-    def %(tag: String, tagScore: Int): AsyncParser[T] =
+    def %(tag: String, tagScore: Int): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(updateCompletionsTag(_, Some(tag), Some(tagScore))))
 
     /** An operator to specify the completion tag, score and description of a parser
@@ -149,7 +152,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param tagDescription the completion tag description
       * @return wrapper `Parser` instance specifying completion tag
       */
-    def %(tag: String, tagScore: Int, tagDescription: String): AsyncParser[T] =
+    def %(tag: String, tagScore: Int, tagDescription: String): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(updateCompletionsTag(_, Some(tag), Some(tagScore), Some(tagDescription))))
 
     /** An operator to specify the completion tag, score, description and meta of a parser
@@ -159,21 +162,21 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param tagMeta the completion tag meta
       * @return wrapper `Parser` instance specifying completion tag
       */
-    def %(tag: String, tagScore: Int, tagDescription: String, tagMeta: JValue): AsyncParser[T] =
+    def %(tag: String, tagScore: Int, tagDescription: String, tagMeta: M): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(updateCompletionsTag(_, Some(tag), Some(tagScore), Some(tagDescription), Some(tagMeta))))
 
     /** An operator to specify the completion tag
       * @param tag the completion tag
       * @return wrapper `Parser` instance specifying completion tag
       */
-    def %(tag: CompletionTag): AsyncParser[T] =
+    def %(tag: CompletionTag[M]): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(updateCompletionsTag(_, Some(tag.label), Some(tag.score), tag.description, tag.meta)))
 
     /** An operator to specify the completion tag description of a parser (empty by default)
       * @param tagDescription the completion description (to be used e.g. to add information to a completion entry)
       * @return wrapper `Parser` instance specifying the completion description
       */
-    def %?(tagDescription: String): AsyncParser[T] =
+    def %?(tagDescription: String): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(updateCompletionsTag(_, None, None, Some(tagDescription))))
 
     /** An operator to specify the completion tag meta-data of a parser in JSON format (empty by default).
@@ -183,7 +186,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param tagMeta the JValue for completion tag meta-data (to be used e.g. to specify the visual style for a completion tag in the menu)
       * @return wrapper `Parser` instance specifying the completion tag meta-data
       */
-    def %%(tagMeta: JValue): AsyncParser[T] =
+    def %%(tagMeta: M): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(_.map(set => CompletionSet(set.tag.withMeta(tagMeta), set.completions))))
 
     /** An operator to specify the meta-data for completions of a parser (empty by default).
@@ -191,7 +194,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param meta the completion meta-data (to be used e.g. to specify the visual style for a completion entry in the menu)
       * @return wrapper `Parser` instance specifying the completion meta-data
       */
-    def %-%(meta: JValue): AsyncParser[T] =
+    def %-%(meta: M): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(_.map(set => CompletionSet(set.tag, set.entries.map(e => e.withMeta(meta))))))
 
     /**
@@ -202,10 +205,10 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param globalMeta the JValue for completions meta-data (to be used e.g. to specify the visual style for the completion menu)
       * @return wrapper `Parser` instance specifying the completions meta-data
       */
-    def %%%(globalMeta: JValue): AsyncParser[T] =
+    def %%%(globalMeta: M): AsyncParser[T, M] =
       AsyncParser(this, in => this.completions(in).map(_.withMeta(globalMeta)))
 
-    def flatMap[U](f: T => AsyncParser[U]): AsyncParser[U] =
+    def flatMap[U](f: T => AsyncParser[U, M]): AsyncParser[U, M] =
       AsyncParser(in =>
                     this(in).flatMap {
                       case Success(result, next) => f(result)(next)
@@ -213,16 +216,18 @@ trait AsyncCompletionSupport extends CompletionSupport {
                   },
                   completions)
 
-    def map[U](f: T => U): AsyncParser[U] =
+    def map[U](f: T => U): AsyncParser[U, M] =
       AsyncParser(in => this(in).map(_.map(f)), completions)
 
-    def mapCompletions(fc: Completions => Completions): AsyncParser[T] = AsyncParser(this, in => this.completions(in).map(fc))
+    def mapCompletions[N](fc: Completions[M] => Completions[N])(implicit semigroup: Semigroup[N], encoder: Encoder[N]): AsyncParser[T, N] =
+      AsyncParser(this, in => this.completions(in).map(fc))
 
-    def map[U](f: T => U, fc: Completions => Completions): AsyncParser[U] = AsyncParser(this.map(f), this.mapCompletions(fc).completions)
+    def map[U, N](f: T => U, fc: Completions[M] => Completions[N])(implicit semigroup: Semigroup[N], encoder: Encoder[N]): AsyncParser[U, N] =
+      AsyncParser(this.map(f), this.mapCompletions(fc).completions)
 
-    def filter(p: T => Boolean): AsyncParser[T] = withFilter(p)
+    def filter(p: T => Boolean): AsyncParser[T, M] = withFilter(p)
 
-    def withFilter(p: T => Boolean): AsyncParser[T] =
+    def withFilter(p: T => Boolean): AsyncParser[T, M] =
       AsyncParser(in => {
         for {
           r <- this(in)
@@ -239,7 +244,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       *         but easier to pattern match on) that contains the result of `p` and
       *         that of `q`. The resulting parser fails if either `p` or `q` fails.
       */
-    def ~[U](q: => AsyncParser[U]): AsyncParser[~[T, U]] = {
+    def ~[U](q: => AsyncParser[U, M]): AsyncParser[~[T, U], M] = {
       lazy val p = q
       AsyncParser(for (a <- this; b <- p) yield new ~(a, b), in => seqCompletions(in, p))
     }.named("~")
@@ -252,7 +257,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       *        succeeds -- evaluated at most once, and only when necessary.
       * @return a `Parser` that -- on success -- returns the result of `q`.
       */
-    def ~>[U](q: => AsyncParser[U]): AsyncParser[U] = {
+    def ~>[U](q: => AsyncParser[U, M]): AsyncParser[U, M] = {
       lazy val p = q
       AsyncParser(for (_ <- this; b <- p) yield b, in => seqCompletions(in, p))
     }.named("~>")
@@ -267,7 +272,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param q a parser that will be executed after `p` (this parser) succeeds -- evaluated at most once, and only when necessary
       * @return a `Parser` that -- on success -- returns the result of `p`.
       */
-    def <~[U](q: => AsyncParser[U]): AsyncParser[T] = {
+    def <~[U](q: => AsyncParser[U, M]): AsyncParser[T, M] = {
       lazy val p = q
       AsyncParser(for (a <- this; _ <- p) yield a, in => seqCompletions(in, p))
     }.named("<~")
@@ -282,7 +287,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       *         that contains the result of `p` and that of `q`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    def ~![U](q: => AsyncParser[U]): AsyncParser[~[T, U]] = {
+    def ~![U](q: => AsyncParser[U, M]): AsyncParser[~[T, U], M] = {
       lazy val p = q
       OnceAsyncParser(for (a <- this; b <- commit(p)) yield new ~(a, b), in => seqCompletions(in, p)).named("~!")
     }
@@ -296,7 +301,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @return a `Parser` that -- on success -- returns the result of `q`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    def ~>![U](q: => AsyncParser[U]): AsyncParser[U] = {
+    def ~>![U](q: => AsyncParser[U, M]): AsyncParser[U, M] = {
       lazy val p = q
       OnceAsyncParser(for (_ <- this; b <- commit(p)) yield b, in => seqCompletions(in, p))
     }.named("~>!")
@@ -310,7 +315,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @return a `Parser` that -- on success -- reutrns the result of `p`.
       *         The resulting parser fails if either `p` or `q` fails, this failure is fatal.
       */
-    def <~![U](q: => AsyncParser[U]): AsyncParser[T] = {
+    def <~![U](q: => AsyncParser[U, M]): AsyncParser[T, M] = {
       lazy val p = q
       OnceAsyncParser(for (a <- this; _ <- commit(p)) yield a, in => seqCompletions(in, p))
     }.named("<~!")
@@ -326,7 +331,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       *         - `p` succeeds, ''or''
       *         - if `p` fails allowing back-tracking and `q` succeeds.
       */
-    def |[U >: T](q: => AsyncParser[U]): AsyncParser[U] =
+    def |[U >: T](q: => AsyncParser[U, M]): AsyncParser[U, M] =
       append(q).named("|")
 
     /** A parser combinator for alternative with longest match composition.
@@ -337,7 +342,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param q a parser that accepts if p consumes less characters. -- evaluated at most once, and only when necessary
       * @return a `Parser` that returns the result of the parser consuming the most characters (out of `p` and `q`).
       */
-    def |||[U >: T](q: => AsyncParser[U]): AsyncParser[U] = {
+    def |||[U >: T](q: => AsyncParser[U, M]): AsyncParser[U, M] = {
       lazy val p = q
       AsyncParser(
         in =>
@@ -361,7 +366,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @return a parser that has the same behaviour as the current parser, but whose result is
       *         transformed by `f`.
       */
-    def ^^[U](f: T => U): AsyncParser[U] = map(f).named(toString + "^^")
+    def ^^[U](f: T => U): AsyncParser[U, M] = map(f).named(toString + "^^")
 
     /** A parser combinator that changes a successful result into the specified value.
       *
@@ -370,7 +375,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @param v The new result for the parser, evaluated at most once (if `p` succeeds), not evaluated at all if `p` fails.
       * @return a parser that has the same behaviour as the current parser, but whose successful result is `v`
       */
-    def ^^^[U](v: => U): AsyncParser[U] =
+    def ^^^[U](v: => U): AsyncParser[U, M] =
       AsyncParser(in => {
         lazy val v0 = v // lazy argument
         this(in).map(_.map(_ => v0))
@@ -389,7 +394,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @return a parser that succeeds if the current parser succeeds <i>and</i> `f` is applicable
       *         to the result. If so, the result will be transformed by `f`.
       */
-    def ^?[U](f: PartialFunction[T, U], error: T => String): AsyncParser[U] =
+    def ^?[U](f: PartialFunction[T, U], error: T => String): AsyncParser[U, M] =
       AsyncParser(in => this(in).map(_.mapPartial(f, error)), completions).named(toString + "^?")
 
     /** A parser combinator for partial function application.
@@ -402,7 +407,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       * @return a parser that succeeds if the current parser succeeds <i>and</i> `f` is applicable
       *         to the result. If so, the result will be transformed by `f`.
       */
-    def ^?[U](f: PartialFunction[T, U]): AsyncParser[U] =
+    def ^?[U](f: PartialFunction[T, U]): AsyncParser[U, M] =
       ^?(f, r => "Constructor function not defined at " + r)
 
     /** A parser combinator that parameterizes a subsequent parser with the
@@ -427,7 +432,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       *  @return a parser that succeeds if this parser succeeds (with result `x`)
       *          and if then `fq(x)` succeeds
       */
-    def into[U](fq: T => AsyncParser[U]): AsyncParser[U] =
+    def into[U](fq: T => AsyncParser[U, M]): AsyncParser[U, M] =
       AsyncParser(flatMap(fq),
                   in =>
                     this(in).flatMap {
@@ -436,7 +441,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
                   })
 
     /** Returns `into(fq)`. */
-    def >>[U](fq: T => AsyncParser[U]) = into(fq)
+    def >>[U](fq: T => AsyncParser[U, M]) = into(fq)
 
     /** Returns a parser that repeatedly parses what this parser parses.
       *
@@ -450,7 +455,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       *
       * @return chainl1(this, sep)
       */
-    def *[U >: T](sep: => AsyncParser[(U, U) => U]) = chainl1(this, sep)
+    def *[U >: T](sep: => AsyncParser[(U, U) => U, M]) = chainl1(this, sep)
 
     /** Returns a parser that repeatedly (at least once) parses what this parser parses.
       *
@@ -485,7 +490,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       *  @param msg The message that will replace the default failure message.
       *  @return    A parser with the same properties and different failure message.
       */
-    def withFailureMessage(msg: String) =
+    def withFailureMessage(msg: String): AsyncParser[T, M] =
       AsyncParser(in =>
                     this(in).map {
                       case Failure(_, next) => Failure(msg, next)
@@ -514,7 +519,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
       *  @param msg The message that will replace the default failure message.
       *  @return    A parser with the same properties and different failure message.
       */
-    def withErrorMessage(msg: String) =
+    def withErrorMessage(msg: String): AsyncParser[T, M] =
       AsyncParser(in =>
                     this(in).map {
                       case Error(_, next) => Error(msg, next)
@@ -527,7 +532,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     *  will give up as soon as it encounters an error, on failure it simply
     *  tries the next alternative).
     */
-  def commit[T](p: => AsyncParser[T]) =
+  def commit[T, M](p: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]) =
     AsyncParser(in =>
                   p(in).map {
                     case s @ Success(_, _)  => s
@@ -540,7 +545,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * print debugging information to stdout before and after
     * being applied.
     */
-  def log[T](p: => AsyncParser[T])(name: String): AsyncParser[T] =
+  def log[T, M](p: => AsyncParser[T, M])(name: String)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[T, M] =
     AsyncParser(
       in => {
         println(s"trying $name at \n${inputPositionDebugString(in)}")
@@ -567,8 +572,9 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @param p a `Parser` that is to be applied successively to the input
     * @return A parser that returns a list of results produced by repeatedly applying `p` to the input.
     */
-  def rep[T](p: => AsyncParser[T]): AsyncParser[List[T]] =
-    rep1(p) | success(List())
+  def rep[T, M](p: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[List[T], M] = {
+    rep1(p) | success[List[T], M](List[T]())
+  }
 
   /** A parser generator for interleaved repetitions.
     *
@@ -582,8 +588,9 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @return A parser that returns a list of results produced by repeatedly applying `p` (interleaved with `q`) to the input.
     *         The results of `p` are collected in a list. The results of `q` are discarded.
     */
-  def repsep[T](p: => AsyncParser[T], q: => AsyncParser[Any]): AsyncParser[List[T]] =
-    rep1sep(p, q) | success(List())
+  def repsep[T, M](p: => AsyncParser[T, M], q: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[List[T], M] = {
+    rep1sep(p, q) | success[List[T], M](List[T]())
+  }
 
   /** A parser generator for non-empty repetitions.
     *
@@ -594,7 +601,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @return A parser that returns a list of results produced by repeatedly applying `p` to the input
     *        (and that only succeeds if `p` matches at least once).
     */
-  def rep1[T](p: => AsyncParser[T]): AsyncParser[List[T]] =
+  def rep1[T, M](p: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[List[T], M] =
     rep1(p, p)
 
   /** A parser generator for non-empty repetitions.
@@ -608,7 +615,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @return A parser that returns a list of results produced by first applying `f` and then
     *         repeatedly `p` to the input (it only succeeds if `f` matches).
     */
-  def rep1[T](first: => AsyncParser[T], q: => AsyncParser[T]): AsyncParser[List[T]] = {
+  def rep1[T, M](first: => AsyncParser[T, M], q: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[List[T], M] = {
     lazy val p = q // lazy argument
     AsyncParser(
       in => {
@@ -626,7 +633,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
         }
       },
       in => {
-        def continue(in: Input): Task[Completions] = {
+        def continue(in: Input): Task[Completions[M]] = {
           val currentCompletions = p.completions(in)
           p(in) flatMap {
             case Success(_, rest) => currentCompletions |+| continue(rest)
@@ -652,9 +659,9 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @return    A parser that returns a list of results produced by repeatedly applying `p` to the input
     *        (and that only succeeds if `p` matches exactly `n` times).
     */
-  def repN[T](num: Int, q: => AsyncParser[T]): AsyncParser[List[T]] = {
+  def repN[T, M](num: Int, q: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[List[T], M] = {
     val p = q // avoid repeatedly re-evaluating by-name parser
-    if (num == 0) success(Nil)
+    if (num == 0) success[List[T], M](Nil)
     else
       AsyncParser(
         in => {
@@ -671,9 +678,9 @@ trait AsyncCompletionSupport extends CompletionSupport {
         },
         in => {
           var parsedCount = 0
-          def completions(in0: Input): Task[Completions] =
+          def completions(in0: Input): Task[Completions[M]] =
             if (parsedCount == num) {
-              Task.eval(Completions.empty)
+              Task.eval(Completions.empty[M])
             } else {
               val currentCompletions = p.completions(in0)
               p(in0) flatMap {
@@ -681,7 +688,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
                 case _: NoSuccess     => currentCompletions
               }
             }
-          completions(in).map(r => if (parsedCount < num) r else Completions.empty)
+          completions(in).map(r => if (parsedCount < num) r else Completions.empty[M])
         }
       )
   }
@@ -698,7 +705,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     *         (and that only succeeds if `p` matches at least once).
     *         The results of `p` are collected in a list. The results of `q` are discarded.
     */
-  def rep1sep[T](p: => AsyncParser[T], q: => AsyncParser[Any]): AsyncParser[List[T]] =
+  def rep1sep[T, M](p: => AsyncParser[T, M], q: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[List[T], M] =
     p ~ rep(q ~> p) ^^ { case x ~ y => x :: y }
 
   /** A parser generator that, roughly, generalises the rep1sep generator so
@@ -712,7 +719,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @param q a parser that parses the token(s) separating the elements, yielding a left-associative function that
     *          combines two elements into one
     */
-  def chainl1[T](p: => AsyncParser[T], q: => AsyncParser[(T, T) => T]): AsyncParser[T] =
+  def chainl1[T, M](p: => AsyncParser[T, M], q: => AsyncParser[(T, T) => T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[T, M] =
     chainl1(p, p, q)
 
   /** A parser generator that, roughly, generalises the `rep1sep` generator
@@ -725,7 +732,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     *          yielding a left-associative function that combines two elements
     *          into one
     */
-  def chainl1[T, U](first: => AsyncParser[T], p: => AsyncParser[U], q: => AsyncParser[(T, U) => T]): AsyncParser[T] =
+  def chainl1[T, U, M](first: => AsyncParser[T, M], p: => AsyncParser[U, M], q: => AsyncParser[(T, U) => T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[T, M] =
     first ~ rep(q ~ p) ^^ {
       case x ~ xs =>
         xs.foldLeft(x: T) { case (a, f ~ b) => f(a, b) } // x's type annotation is needed to deal with changed type inference due to SI-5189
@@ -744,7 +751,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @param combine the "last" (left-most) combination function to be applied
     * @param first   the "first" (right-most) element to be combined
     */
-  def chainr1[T, U](p: => AsyncParser[T], q: => AsyncParser[(T, U) => U], combine: (T, U) => U, first: U): AsyncParser[U] =
+  def chainr1[T, U, M](p: => AsyncParser[T, M], q: => AsyncParser[(T, U) => U, M], combine: (T, U) => U, first: U)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[U, M] =
     p ~ rep(q ~ p) ^^ {
       case x ~ xs =>
         (new ~(combine, x) :: xs).foldRight(first) { case (f ~ a, b) => f(a, b) }
@@ -758,19 +765,21 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @return a `Parser` that always succeeds: either with the result provided by `p` or
     *         with the empty result
     */
-  def opt[T](p: => AsyncParser[T]): AsyncParser[Option[T]] =
-    p ^^ (x => Some(x)) | success(None)
+  def opt[T, M](p: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[Option[T], M] = {
+    val empty: Parser[Option[T], M] = success(Option.empty[T])
+    p ^^ (x => Some(x)) | empty
+  }
 
   /** Wrap a parser so that its failures and errors become success and
     *  vice versa -- it never consumes any input.
     */
-  def not[T](p: => AsyncParser[T]): AsyncParser[Unit] =
+  def not[T, M](p: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[Unit, M] =
     AsyncParser(in =>
                   p(in) map {
                     case Success(_, rest) => Failure("Expected failure", rest)
                     case _                => Success((), in)
                 },
-                _ => Task.eval(Completions.empty))
+                _ => Task.eval(Completions.empty[M]))
 
   /** A parser generator for guard expressions. The resulting parser will
     *  fail or succeed just like the one given as parameter but it will not
@@ -780,7 +789,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     * @return A parser that returns success if and only if `p` succeeds but
     *         never consumes any input
     */
-  def guard[T](p: => AsyncParser[T]): AsyncParser[T] =
+  def guard[T, M](p: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[T, M] =
     AsyncParser(in =>
                   p(in) map {
                     case Success(r, _) => Success(r, in)
@@ -796,7 +805,7 @@ trait AsyncCompletionSupport extends CompletionSupport {
     *         result with the start position of the input it consumed,
     *         if it didn't already have a position.
     */
-  def positioned[T <: Positional](p: => AsyncParser[T]): AsyncParser[T] =
+  def positioned[T <: Positional, M](p: => AsyncParser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): AsyncParser[T, M] =
     AsyncParser(in =>
                   p(in) map {
                     case Success(t, in1) => Success(if (t.pos == NoPosition) t setPos in.pos else t, in1)
@@ -804,16 +813,16 @@ trait AsyncCompletionSupport extends CompletionSupport {
                 },
                 p.completions)
 
-  def OnceAsyncParser[T](af: Input => Task[ParseResult[T]], ac: Input => Task[Completions]): AsyncParser[T] with OnceAsyncParser[T] =
-    new AsyncParser[T] with OnceAsyncParser[T] {
+  def OnceAsyncParser[T, M](af: Input => Task[ParseResult[T]], ac: Input => Task[Completions[M]])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): OnceAsyncParser[T, M] =
+    new OnceAsyncParser[T, M] {
       override def completions(in: Input) = ac(in)
       override def apply(in: Input)       = af(in)
     }
 
   /** A parser whose `~` combinator disallows back-tracking.
     */
-  trait OnceAsyncParser[+T] extends AsyncParser[T] {
-    override def ~[U](p: => AsyncParser[U]): AsyncParser[~[T, U]] =
+  abstract class OnceAsyncParser[+T, M](implicit semigroup: Semigroup[M], encoder: Encoder[M]) extends AsyncParser[T, M] {
+    override def ~[U](p: => AsyncParser[U, M]): AsyncParser[~[T, U], M] =
       AsyncParser(for (a <- this; b <- commit(p)) yield new ~(a, b), super.~(p).completions).named("~")
   }
 

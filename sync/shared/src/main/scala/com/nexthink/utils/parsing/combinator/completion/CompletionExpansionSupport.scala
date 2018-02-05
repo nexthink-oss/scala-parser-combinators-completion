@@ -1,5 +1,7 @@
-
 package com.nexthink.utils.parsing.combinator.completion
+
+import cats.kernel.Semigroup
+import io.circe.Encoder
 
 import scala.util.parsing.input.{CharSequenceReader, OffsetPosition, Position, Reader}
 
@@ -14,7 +16,8 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
     * @tparam T the parser type
     * @return a parser adapter performing completion expansion
     */
-  def expandedCompletions[T](p: Parser[T], onlyAtInputEnd: Boolean = true): Parser[T] = expandedCompletionsWithLimiter(p, p, onlyAtInputEnd)
+  def expandedCompletions[T, M](p: Parser[T, M], onlyAtInputEnd: Boolean = true)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
+    expandedCompletionsWithLimiter(p, p, onlyAtInputEnd)
 
   /**
     * Adapts a parser so that completing it will construct the list of all possible alternatives up to the point
@@ -27,7 +30,7 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
     * @tparam T the parser type
     * @return a parser adapter performing completion expansion limited according to `limiter` parser
     */
-  def expandedCompletionsWithLimiter[T](p: Parser[T], limiter: Parser[Any], onlyAtInputEnd: Boolean = true): Parser[T] =
+  def expandedCompletionsWithLimiter[T, M](p: Parser[T, M], limiter: Parser[Any, M], onlyAtInputEnd: Boolean = true)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
     Parser(
       p,
       in => {
@@ -40,12 +43,12 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
       }
     )
 
-  private def exploreCompletions[T](p: Parser[T], stop: Parser[T], in: Input): Completions = {
-    def completeString(s: String, position: Int, c: Completion) = {
+  private def exploreCompletions[T, M](p: Parser[T, M], stop: Parser[Any, M], in: Input)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] = {
+    def completeString(s: String, position: Int, c: Completion[M]) = {
       val input = s.substring(0, position - 1)
       if (input.trim.isEmpty) c.value.toString() else s"$input ${c.value}"
     }
-    def exploreCompletionsRec(str: String, completions: Completions): Completions = {
+    def exploreCompletionsRec(str: String, completions: Completions[M]): Completions[M] = {
       if (completions.isEmpty) completions
       else
         completions.allSets
@@ -75,7 +78,7 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
     }
   }
 
-  private case class ExplorerReader(exploredParser: Parser[_], override val source: java.lang.CharSequence, override val offset: Int) extends Reader[Char] {
+  private case class ExplorerReader(exploredParser: Parser[_, _], override val source: java.lang.CharSequence, override val offset: Int) extends Reader[Char] {
     val charReader = new CharSequenceReader(source, offset)
 
     def first = charReader.first
@@ -92,7 +95,7 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
   }
 
   private case object ExplorerReader {
-    def apply(exploredParser: Parser[_], source: java.lang.CharSequence): ExplorerReader = ExplorerReader(exploredParser, source, 0)
+    def apply(exploredParser: Parser[_, _], source: java.lang.CharSequence): ExplorerReader = ExplorerReader(exploredParser, source, 0)
   }
 
 }
