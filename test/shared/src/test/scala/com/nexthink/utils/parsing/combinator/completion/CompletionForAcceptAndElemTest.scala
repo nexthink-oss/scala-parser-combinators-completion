@@ -67,5 +67,5 @@ class CompletionForAcceptAndElemTest extends FlatSpec with Matchers {
     result.allCompletions.map(_.value.head).toSet shouldBe tokens
   }
 
-  private def headToken(completions: Iterable[TestParser.Completion]) = completions.map(_.value).head.head
+  private def headToken(completions: Iterable[TestParser.Completion[_]]) = completions.map(_.value).head.head
 }

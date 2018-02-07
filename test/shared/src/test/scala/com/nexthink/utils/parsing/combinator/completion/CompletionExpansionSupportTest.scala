@@ -1,8 +1,8 @@
 package com.nexthink.utils.parsing.combinator.completion
 
+import java.io
+
 import com.nexthink.utils.parsing.combinator.completion.CompletionTestDefinitions.Tagged
-import org.json4s.JsonAST.JValue
-import org.json4s.JsonDSL._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.parsing.combinator.Parsers
@@ -10,10 +10,10 @@ import scala.util.parsing.combinator.Parsers
 class CompletionExpansionSupportTest extends FlatSpec with Matchers {
 
   object FiniteArithmeticParser extends Parsers with CompletionExpansionSupport {
-    val number                               = "[0-9]+".r %> "99"
-    def expr(maxNesting: Int)                = term(maxNesting) ~ ("+" | "-") ~! term(maxNesting)
-    def term(maxNesting: Int)                = factor(maxNesting) ~ "*" ~! factor(maxNesting)
-    def factor(maxNesting: Int): Parser[Any] = if (maxNesting == 0) number else number | "(" ~> expr(maxNesting - 1) <~ ")"
+    val number                                     = "[0-9]+".r %> "99"
+    def expr(maxNesting: Int)                      = term(maxNesting) ~ ("+" | "-") ~! term(maxNesting)
+    def term(maxNesting: Int)                      = factor(maxNesting) ~ "*" ~! factor(maxNesting)
+    def factor(maxNesting: Int): Parser[Any, Unit] = if (maxNesting == 0) number else number | "(" ~> expr(maxNesting - 1) <~ ")"
 
     def exprWithExpandedCompletions() = expandedCompletions(expr(1))
   }
@@ -30,13 +30,13 @@ class CompletionExpansionSupportTest extends FlatSpec with Matchers {
   }
 
   object InfiniteExpressionParser extends Parsers with CompletionExpansionSupport with CompletionTestAsserters {
-    val globalMeta: JValue       = ("expansions" -> "global")
-    val fox                      = "the quick brown fox"
-    val jumpsOver                = "which jumps over the lazy" % "action"
-    val jumpsOverDogOrCat        = jumpsOver ~ ("dog" | "cat") % "animal" %? "dogs and cats" % 10
-    lazy val parser              = jumpsOverDogOrCat | jumpsOverDogOrCat ~ which()
-    def which(): Parser[Any]     = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat) %%% globalMeta
-    lazy val infiniteDogsAndCats = fox ~ which
+    val globalMeta                           = Seq("expansions" -> "global")
+    val fox                                  = "the quick brown fox"
+    val jumpsOver                            = "which jumps over the lazy" % "action"
+    val jumpsOverDogOrCat: Parser[Any, Unit] = jumpsOver ~ ("dog" | "cat") % "animal" %? "dogs and cats" % 10
+    lazy val parser                          = jumpsOverDogOrCat | jumpsOverDogOrCat ~ which()
+    def which(): Parser[Any, Unit]           = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat) %%% globalMeta
+    lazy val infiniteDogsAndCats             = fox ~ which
   }
 
   "infinite expression" should "parse" in {

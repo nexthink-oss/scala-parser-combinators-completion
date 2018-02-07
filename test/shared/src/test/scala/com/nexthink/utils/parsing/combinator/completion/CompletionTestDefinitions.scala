@@ -10,19 +10,19 @@ object CompletionTestDefinitions {
   case class Default(strings: String*) extends AssertionSet {
     def tag: String = ""
   }
-  case class Tagged(tag: String, desc: Option[String], score: Int, meta: Option[JValue], entries: Seq[String], entryMetas: Seq[Option[JValue]]) extends AssertionSet
+  case class Tagged[M](tag: String, desc: Option[String], score: Int, meta: Option[M], entries: Seq[String], entryMetas: Seq[Option[M]]) extends AssertionSet
   case object Tagged {
-    def apply(name: String, strings: String*): Tagged =
+    def apply[M](name: String, strings: String*): Tagged[M] =
       Tagged(name, None, 0, None, strings, Nil)
 
-    def apply(name: String, desc: Option[String], score: Int, strings: String*): Tagged =
+    def apply[M](name: String, desc: Option[String], score: Int, strings: String*): Tagged[M] =
       Tagged(name, desc, score, None, strings, Nil)
   }
 }
 
 trait CompletionTestAsserters extends CompletionTypes with Matchers {
   import CompletionTestDefinitions._
-  def assertSetEquals(expected: AssertionSet, actual: CompletionSet): Unit =
+  def assertSetEquals[M](expected: AssertionSet, actual: CompletionSet[M]): Unit =
     expected match {
       case default @ Default(_*) => {
         default.strings.zip(actual.stringEntries).foreach {
@@ -42,7 +42,7 @@ trait CompletionTestAsserters extends CompletionTypes with Matchers {
         }
       }
     }
-  def assertHasCompletions(expected: Set[AssertionSet], actual: Completions): Unit = {
+  def assertHasCompletions[M](expected: Set[AssertionSet], actual: Completions[M]): Unit = {
     expected.toList.sortBy(_.tag).zip(actual.allSets.toList.sortBy(_.tag.label)).foreach {
       case (e, a) => assertSetEquals(e, a)
     }

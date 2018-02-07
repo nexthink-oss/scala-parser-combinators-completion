@@ -41,7 +41,7 @@ class AsyncParserTests extends FlatSpec with Matchers {
   "convertible parser" should "work" in {
     // Arrange
     object AsyncGrammar extends AsyncRegexCompletionSupport {
-      val sync: Parser[String] = literal("sync")
+      val sync = literal("sync")
       val async = sync.toAsync()
     }
 

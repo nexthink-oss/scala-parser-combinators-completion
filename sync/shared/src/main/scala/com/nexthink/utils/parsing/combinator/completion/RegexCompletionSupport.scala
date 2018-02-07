@@ -1,9 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import cats.kernel.Semigroup
-import io.circe.Encoder
-import io.circe.generic.semiauto._
-
+import com.nexthink.utils.meta.MetaSemigroup
 import scala.util.matching.Regex
 import scala.util.parsing.combinator.RegexParsers
 import scala.util.parsing.input._
@@ -18,7 +15,6 @@ import scala.language.implicitConversions
   */
 trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
   protected val areLiteralsCaseSensitive = false
-  implicit val elemsEncoder: Encoder[Elems] = Encoder.encodeSeq(Encoder.encodeChar)
 
   protected def dropAnyWhiteSpace(input: Input): Input =
     input.drop(handleWhiteSpace(input.source, input.offset) - input.offset)
@@ -54,15 +50,15 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
             literalCompletion // whitespace, free entry possible
           case someOffset: Int if inputAtEnd & someOffset > 0 & someOffset < s.length => // partially entered literal, we are at the end
             literalCompletion
-          case _ => Completions.empty
+          case _ => Completions.empty[Unit]
         }
       }
     )
 
   abstract override implicit def regex(r: Regex): Parser[String, Unit] =
-    Parser(super.regex(r), _ => Completions.empty)
+    Parser(super.regex(r), _ => Completions.empty[Unit])
 
-  override def positioned[T <: Positional, M](p: => Parser[T, M])(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] = {
+  override def positioned[T <: Positional, M](p: => Parser[T, M])(implicit semigroup: MetaSemigroup[M]): Parser[T, M] = {
     lazy val q = p
     Parser[T, M](super.positioned(p), in => q.completions(in))
   }
@@ -78,7 +74,4 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
   /** Returns flattened string completions for character sequence `in` with parser `p`. */
   def completeString[T, M](p: Parser[T, M], input: String): Seq[String] =
     complete(p, input).completionStrings
-
 }
-
-

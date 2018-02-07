@@ -1,7 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import cats.kernel.Semigroup
-import io.circe.Encoder
+import com.nexthink.utils.meta.MetaSemigroup
 
 import scala.util.parsing.input.{CharSequenceReader, OffsetPosition, Position, Reader}
 
@@ -16,7 +15,7 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
     * @tparam T the parser type
     * @return a parser adapter performing completion expansion
     */
-  def expandedCompletions[T, M](p: Parser[T, M], onlyAtInputEnd: Boolean = true)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
+  def expandedCompletions[T, M](p: Parser[T, M], onlyAtInputEnd: Boolean = true)(implicit semigroup: MetaSemigroup[M]): Parser[T, M] =
     expandedCompletionsWithLimiter(p, p, onlyAtInputEnd)
 
   /**
@@ -30,7 +29,8 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
     * @tparam T the parser type
     * @return a parser adapter performing completion expansion limited according to `limiter` parser
     */
-  def expandedCompletionsWithLimiter[T, M](p: Parser[T, M], limiter: Parser[Any, M], onlyAtInputEnd: Boolean = true)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Parser[T, M] =
+  def expandedCompletionsWithLimiter[T, M](p: Parser[T, M], limiter: Parser[Any, M], onlyAtInputEnd: Boolean = true)(
+      implicit semigroup: MetaSemigroup[M]): Parser[T, M] =
     Parser(
       p,
       in => {
@@ -43,7 +43,7 @@ trait CompletionExpansionSupport extends RegexCompletionSupport {
       }
     )
 
-  private def exploreCompletions[T, M](p: Parser[T, M], stop: Parser[Any, M], in: Input)(implicit semigroup: Semigroup[M], encoder: Encoder[M]): Completions[M] = {
+  private def exploreCompletions[T, M](p: Parser[T, M], stop: Parser[Any, M], in: Input)(implicit semigroup: MetaSemigroup[M]): Completions[M] = {
     def completeString(s: String, position: Int, c: Completion[M]) = {
       val input = s.substring(0, position - 1)
       if (input.trim.isEmpty) c.value.toString() else s"$input ${c.value}"

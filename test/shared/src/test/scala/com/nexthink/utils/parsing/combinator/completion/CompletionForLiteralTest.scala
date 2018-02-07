@@ -9,8 +9,7 @@ class CompletionForLiteralTest extends FlatSpec with Matchers {
   val someLiteralPrefix          = "lit"
 
   object Parser extends Parsers with RegexCompletionSupport {
-    val literal: Parser[String] = someLiteral
-
+    val literal = someLiteral
     val combination = someLiteral | otherLiteralWithSamePrefix
   }
 

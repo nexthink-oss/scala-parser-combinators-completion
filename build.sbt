@@ -6,7 +6,7 @@ lazy val root = project
   .settings(
     commonSettings
   )
-  .aggregate(syncJVM, syncJS, asyncJVM, asyncJS)
+  .aggregate(syncJVM, syncJS, asyncJVM, asyncJS, encodersJS, encodersJVM)
   .dependsOn(testJVM, testJS)
   .settings(
     publish := {},
@@ -15,7 +15,7 @@ lazy val root = project
 
 lazy val test = crossProject
   .settings(commonSettings)
-  .dependsOn(sync, async)
+  .dependsOn(sync, async, encoders)
   .settings(
     publish := {},
     publishLocal := {}
@@ -44,6 +44,21 @@ lazy val async = crossProject
   )
 lazy val asyncJVM = async.jvm
 lazy val asyncJS  = async.js.enablePlugins(ScalaJSPlugin)
+
+lazy val encoders = crossProject
+  .dependsOn(sync, async)
+  .settings(
+    commonSettings,
+    name := "scala-parser-combinators-completion-encoders",
+    // circe
+    libraryDependencies ++= Seq(
+      "io.circe" %%% "circe-core"    % "0.9.1",
+      "io.circe" %%% "circe-generic" % "0.9.1",
+      "io.circe" %%% "circe-parser"  % "0.9.1"
+    )
+  )
+lazy val encodersJVM = encoders.jvm
+lazy val encodersJS  = encoders.js.enablePlugins(ScalaJSPlugin)
 
 lazy val commonSettings = Seq(
   organization := "com.nexthink",
@@ -74,15 +89,10 @@ lazy val commonSettings = Seq(
                              sys.env.getOrElse("SONATYPE_USER", ""),
                              sys.env.getOrElse("SONATYPE_PASSWORD", "")),
   libraryDependencies ++= Seq(
-    "org.scala-lang.modules"     %%% "scala-parser-combinators" % "1.1.0",
-    "io.circe"                   %%% "circe-core" % "0.9.1",
-    "io.circe"                   %%% "circe-generic" % "0.9.1",
-    "io.circe"                   %%% "circe-parser" % "0.9.1",
-    "org.typelevel"              %%% "cats-laws" % "1.0.1" % Test,
-    "org.typelevel"              %%% "cats-testkit" % "1.0.1" % Test,
+    "org.scala-lang.modules"     %%% "scala-parser-combinators"  % "1.1.0",
     "com.github.alexarchambault" %%% "scalacheck-shapeless_1.13" % "1.1.6" % Test,
-    "org.scalacheck"             %%% "scalacheck" % "1.13.4" % Test,
-    "org.scalatest"              %%% "scalatest" % "3.0.4" % Test
+    "org.scalacheck"             %%% "scalacheck"                % "1.13.4" % Test,
+    "org.scalatest"              %%% "scalatest"                 % "3.0.4" % Test
   )
 )
 

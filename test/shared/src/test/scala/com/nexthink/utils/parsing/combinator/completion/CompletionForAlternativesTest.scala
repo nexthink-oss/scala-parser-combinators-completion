@@ -18,11 +18,11 @@ class CompletionForAlternativesTest extends FlatSpec with Matchers {
     val alternativesWithCommonPrefix      = (common + left) | common ~ right
   }
 
-  def syncParserCompletesTo(in: String, completions: Seq[String], parser: TestParser.Parser[_]): Any =
+  def syncParserCompletesTo(in: String, completions: Seq[String], parser: TestParser.Parser[_, _]): Any =
     TestParser.completeString(parser, in) shouldBe completions
-  def asyncParserCompletesTo(in: String, completions: Seq[String], parser: AsyncTestParser.AsyncParser[_]): Any =
+  def asyncParserCompletesTo(in: String, completions: Seq[String], parser: AsyncTestParser.AsyncParser[_, _]): Any =
     AsyncTestParser.completeString(parser, in) shouldBe completions
-  def parsersCompleteTo(in: String, completions: Seq[String], parser: TestParser.Parser[_], asyncParser: AsyncTestParser.AsyncParser[_]) = {
+  def parsersCompleteTo(in: String, completions: Seq[String], parser: TestParser.Parser[_, _], asyncParser: AsyncTestParser.AsyncParser[_, _]) = {
     syncParserCompletesTo(in, completions, parser)
     asyncParserCompletesTo(in, completions, asyncParser)
   }

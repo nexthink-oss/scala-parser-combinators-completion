@@ -12,7 +12,7 @@ class AlphabeticalSortingSupportTests extends FlatSpec with Matchers {
   private val randomList = (0 to 10000).reverse.flatMap(i => List("a" + rand.nextInt(), "a" + rand.nextInt()))
 
   private def testList(list: Seq[String], expected: List[(String, Int)]): Unit = {
-    val completions: CompletionTypes#CompletionSet = testParser.alphabeticallySortedCompletions(list, 15)
+    val completions = testParser.alphabeticallySortedCompletions(list, 15)
 
     val map = completions.completions.map { case (k, v) => (k.toString, v.score) }.toList.sortBy(_._2).reverse
 
