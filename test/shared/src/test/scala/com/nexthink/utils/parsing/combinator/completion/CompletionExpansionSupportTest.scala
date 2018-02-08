@@ -1,7 +1,5 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import java.io
-
 import com.nexthink.utils.parsing.combinator.completion.CompletionTestDefinitions.Tagged
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -13,7 +11,7 @@ class CompletionExpansionSupportTest extends FlatSpec with Matchers {
     val number                                     = "[0-9]+".r %> "99"
     def expr(maxNesting: Int)                      = term(maxNesting) ~ ("+" | "-") ~! term(maxNesting)
     def term(maxNesting: Int)                      = factor(maxNesting) ~ "*" ~! factor(maxNesting)
-    def factor(maxNesting: Int): Parser[Any, Unit] = if (maxNesting == 0) number else number | "(" ~> expr(maxNesting - 1) <~ ")"
+    def factor(maxNesting: Int): Parser[Any, Nothing] = if (maxNesting == 0) number else number | "(" ~> expr(maxNesting - 1) <~ ")"
 
     def exprWithExpandedCompletions() = expandedCompletions(expr(1))
   }
@@ -30,12 +28,12 @@ class CompletionExpansionSupportTest extends FlatSpec with Matchers {
   }
 
   object InfiniteExpressionParser extends Parsers with CompletionExpansionSupport with CompletionTestAsserters {
-    val globalMeta                           = Seq("expansions" -> "global")
+    val globalMeta: (String, String) = "expansions" -> "global"
     val fox                                  = "the quick brown fox"
     val jumpsOver                            = "which jumps over the lazy" % "action"
-    val jumpsOverDogOrCat: Parser[Any, Unit] = jumpsOver ~ ("dog" | "cat") % "animal" %? "dogs and cats" % 10
+    val jumpsOverDogOrCat: Parser[Any, Nothing] = jumpsOver ~ ("dog" | "cat") % "animal" %? "dogs and cats" % 10
     lazy val parser                          = jumpsOverDogOrCat | jumpsOverDogOrCat ~ which()
-    def which(): Parser[Any, Unit]           = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat) %%% globalMeta
+    def which()          = expandedCompletionsWithLimiter(parser, limiter = jumpsOverDogOrCat ~ jumpsOverDogOrCat) %%% globalMeta
     lazy val infiniteDogsAndCats             = fox ~ which
   }
 

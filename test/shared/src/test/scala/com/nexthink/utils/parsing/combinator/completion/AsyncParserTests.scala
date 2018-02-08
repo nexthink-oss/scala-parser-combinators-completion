@@ -12,7 +12,9 @@ class AsyncParserTests extends FlatSpec with Matchers {
   object AsyncGrammar extends AsyncRegexCompletionSupport with CompletionTestAsserters {
     val number = "[0-9]+".r %> ("1", "10", "99") % "number" %? "any number" ^^ { _.toInt }
     val term =
-      AsyncParser(in => Task.eval(number(in)).delayExecution(1 second).flatten, in => Task.eval(number.completions(in)).delayExecution(1 second).flatten)
+      AsyncParser(
+        in => Task.eval(number(in)).delayExecution(1 second).flatten,
+        in => Task.eval(number.completions(in)).delayExecution(1 second).flatten)
     def expr = term | "(" ~> term <~ ")"
   }
 
@@ -26,7 +28,7 @@ class AsyncParserTests extends FlatSpec with Matchers {
     // Act
     val asyncCompletion =
       AsyncGrammar
-        .completeAsync(AsyncGrammar.term, "")
+        .completeAsync[Int, Nothing](AsyncGrammar.term, "")
         .map(AsyncGrammar.assertHasCompletions(expected, _))
         .doOnFinish(_ => Task.eval({ asserted = true }))
         .runAsync

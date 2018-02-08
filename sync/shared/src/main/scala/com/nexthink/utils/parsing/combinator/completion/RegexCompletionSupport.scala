@@ -1,6 +1,6 @@
 package com.nexthink.utils.parsing.combinator.completion
 
-import com.nexthink.utils.meta.MetaSemigroup
+import com.nexthink.utils.meta.NxSemigroup
 import scala.util.matching.Regex
 import scala.util.parsing.combinator.RegexParsers
 import scala.util.parsing.input._
@@ -37,12 +37,12 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
     (literalPos, sourcePos)
   }
 
-  abstract override implicit def literal(s: String): Parser[String, Unit] =
-    Parser[String, Unit](
+  abstract override implicit def literal(s: String): Parser[String, Nothing] =
+    Parser[String, Nothing](
       super.literal(s),
       (in: Input) => {
         lazy val literalCompletion =
-          Completions(OffsetPosition(in.source, handleWhiteSpace(in)), CompletionSet(Completion[Unit](s)))
+          Completions[Nothing](OffsetPosition(in.source, handleWhiteSpace(in)), CompletionSet(Completion[Nothing](s)))
         val (literalOffset, sourceOffset) = findMatchOffsets(s, in)
         lazy val inputAtEnd               = sourceOffset == in.source.length
         literalOffset match {
@@ -50,15 +50,15 @@ trait RegexCompletionSupport extends RegexParsers with CompletionSupport {
             literalCompletion // whitespace, free entry possible
           case someOffset: Int if inputAtEnd & someOffset > 0 & someOffset < s.length => // partially entered literal, we are at the end
             literalCompletion
-          case _ => Completions.empty[Unit]
+          case _ => Completions.empty
         }
       }
     )
 
-  abstract override implicit def regex(r: Regex): Parser[String, Unit] =
-    Parser(super.regex(r), _ => Completions.empty[Unit])
+  abstract override implicit def regex(r: Regex): Parser[String, Nothing] =
+    Parser[String, Nothing](super.regex(r), _ => Completions.empty)
 
-  override def positioned[T <: Positional, M](p: => Parser[T, M])(implicit semigroup: MetaSemigroup[M]): Parser[T, M] = {
+  override def positioned[T <: Positional, M](p: => Parser[T, M])(implicit semigroup: NxSemigroup[M]): Parser[T, M] = {
     lazy val q = p
     Parser[T, M](super.positioned(p), in => q.completions(in))
   }

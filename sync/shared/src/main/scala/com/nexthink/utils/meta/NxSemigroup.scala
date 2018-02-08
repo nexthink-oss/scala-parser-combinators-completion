@@ -1,5 +1,5 @@
 package com.nexthink.utils.meta
 
-trait MetaSemigroup[T] {
+trait NxSemigroup[T] {
   def combine(x: T, y: T): T
 }
